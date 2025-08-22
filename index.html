@@ -68,11 +68,13 @@
     </tfoot>
   </table>
 
+  <input type="text" id="globalSearch" placeholder="Cari sekolah di semua kecamatan..." 
+       onkeyup="filterGlobal()" 
+       style="margin:10px 0;padding:6px;width:100%;max-width:400px;">
   <div id="sekolahSection"></div>
-
 <script>
   const kecamatanEndpoints = {
-    "Banawa": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRd8vIhHDUbmD6I2aXLX7-_Ysemt2aXA__wKNGoKN0XWWSWCScv5aSmx06H0xkl8g/pub?gid=1917777904&single=true&output=csv",
+    "Banawa": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRd8vIhHDUbmD6I2aXLX7-_Ysemt2aXA__wKNGoKN0XWWSWCScv5aSmx06H0xkl8w/pub?gid=1917777904&single=true&output=csv",
     "Banawa Tengah": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRnykw5e_i3dwBIeTua-mpFExEJ4w6hROJ5F6OUHiiGpbtunldeKgXlhN_G-D1V8w/pub?gid=1454720232&single=true&output=csv",
     "Banawa Selatan": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRhDJK33BtCz7KEi6DWgqheZBrcdgK0X9Pw1r28u5ec1MK-I-kP-QOqrsY0G2OnEQ/pub?gid=708970016&single=true&output=csv",
     "Rio Pakava": "https://docs.google.com/spreadsheets/d/1_8YllqyTXGDZZCVeozFKAhGru2WS15Bp/export?format=csv",
@@ -90,7 +92,14 @@
     "Sojol Utara": "https://docs.google.com/spreadsheets/d/e/2PACX-1vT41KwECicPb2EY8d8BP1f73RM3dhVWYDOxpaFlHZluKFy9owLzyVX7N7mIUm37Tw/pub?gid=502544387&single=true&output=csv"
   };
 
-  let totalKabupaten = { Ditemukan:0, Tidak:0, Baik:0, Ringan:0, Berat:0, Nilai:0 };
+  let totalKabupaten = { 
+    Ditemukan:0, Tidak:0, 
+    Baik:0, Ringan:0, Berat:0, 
+    Nilai:0,
+    nilaiBaik:0, nilaiRingan:0, nilaiBerat:0
+  };
+
+  let chartKonfirmasi, chartKondisi, chartNilai;
 
   async function fetchData(url) {
     return new Promise((resolve) => {
@@ -108,7 +117,7 @@
     tbody.innerHTML = "";
     document.getElementById("sekolahSection").innerHTML = "";
 
-    totalKabupaten = { Ditemukan:0, Tidak:0, Baik:0, Ringan:0, Berat:0, Nilai:0 };
+    totalKabupaten = { Ditemukan:0, Tidak:0, Baik:0, Ringan:0, Berat:0, Nilai:0, nilaiBaik:0, nilaiRingan:0, nilaiBerat:0 };
 
     for (const [nama, url] of Object.entries(kecamatanEndpoints)) {
       const data = await fetchData(url);
@@ -122,9 +131,9 @@
         const sekolah = row["Pengguna Barang"]?.trim() || "Tidak Ada Nama";
 
         if(k==="Ditemukan") ditemukan++; else tidak++;
-        if(c==="Baik") baik++;
-        else if(c==="Rusak Ringan") ringan++;
-        else if(c==="Rusak Berat") berat++;
+        if(c==="Baik"){ baik++; totalKabupaten.nilaiBaik += v; }
+        else if(c==="Rusak Ringan"){ ringan++; totalKabupaten.nilaiRingan += v; }
+        else if(c==="Rusak Berat"){ berat++; totalKabupaten.nilaiBerat += v; }
         nilai += v;
 
         if(sekolah){
@@ -141,6 +150,7 @@
       totalKabupaten.Berat+=berat;
       totalKabupaten.Nilai+=nilai;
 
+      // isi tabel rekap
       const tr = document.createElement("tr");
       tr.innerHTML = `<td>${nama}</td>
                       <td>${ditemukan}</td>
@@ -151,9 +161,10 @@
                       <td>${nilai.toLocaleString("id-ID")}</td>`;
       tbody.appendChild(tr);
 
+      // buat tabel sekolah per kecamatan
       const section = document.getElementById("sekolahSection");
       let html = `<h3>Daftar Sekolah - ${nama}</h3>
-                  <table class="table-sekolah">
+                  <table class="sekolahTable">
                     <thead>
                       <tr>
                         <th>Nama Sekolah (Pengguna Barang)</th>
@@ -194,21 +205,19 @@
 
     document.getElementById("lastUpdate").textContent = "Data terakhir diperbarui: " + new Date().toLocaleTimeString();
 
-    // update grafik kabupaten
     updateCharts();
   }
 
-  // fungsi filter global
+  // fungsi filter sekolah global
   function filterGlobal() {
     const filter = document.getElementById("globalSearch").value.toLowerCase();
-    document.querySelectorAll(".table-sekolah tbody tr").forEach(tr => {
+    document.querySelectorAll(".sekolahTable tbody tr").forEach(tr => {
       const namaSekolah = tr.cells[0].textContent.toLowerCase();
       tr.style.display = namaSekolah.includes(filter) ? "" : "none";
     });
   }
 
   // update grafik kabupaten
-  let chartKonfirmasi, chartKondisi, chartNilai;
   function updateCharts() {
     const ctx1 = document.getElementById("rekapKonfirmasi").getContext("2d");
     const ctx2 = document.getElementById("rekapKondisi").getContext("2d");
@@ -237,19 +246,25 @@
     chartNilai = new Chart(ctx3, {
       type: "bar",
       data: {
-        labels: ["Baik", "Rusak Ringan", "Rusak Berat"],
-        datasets: [{
-          label: "Nilai Perolehan (Rp)",
-          data: [totalKabupaten.Baik, totalKabupaten.Ringan, totalKabupaten.Berat]
-        }]
+        labels: ["Nilai Perolehan (Rp)"],
+        datasets: [
+          { label: "Baik", data: [totalKabupaten.nilaiBaik] },
+          { label: "Rusak Ringan", data: [totalKabupaten.nilaiRingan] },
+          { label: "Rusak Berat", data: [totalKabupaten.nilaiBerat] }
+        ]
       },
-      options: { responsive: true, plugins: { legend: { display: false } } }
+      options: {
+        responsive: true,
+        plugins: { legend: { position: "top" } },
+        scales: { x: { stacked: true }, y: { stacked: true } }
+      }
     });
   }
 
   updateData();
   setInterval(updateData, 300000);
 </script>
+
 
 
 </body>
