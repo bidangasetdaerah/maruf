@@ -7,10 +7,39 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <style>
-    body { font-family: sans-serif; margin: 10px; background-color: #f9fafb; }
+    body { font-family: sans-serif; margin: 0; background-color: #f9fafb; }
     h1 { font-size: 1.5rem; margin-bottom: 10px; text-align: center; }
     h2 { font-size: 1.2rem; margin-top: 20px; }
     h3 { font-size: 1rem; margin-top: 15px; color: #1f2937; }
+    .navbar {
+      background-color: #3b82f6;
+      color: white;
+      padding: 10px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+    }
+    .navbar h1 { margin: 0; font-size: 1.2rem; }
+    .navbar ul {
+      list-style: none;
+      display: flex;
+      gap: 15px;
+      margin: 0;
+      padding: 0;
+    }
+    .navbar ul li a {
+      color: white;
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: bold;
+    }
+    .navbar ul li a:hover {
+      text-decoration: underline;
+    }
+    .container { padding: 15px; }
     .dashboard { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 15px; }
     .chart-container, table { background: white; border-radius: 8px; padding: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
     .chart-container { flex: 1 1 300px; }
@@ -19,76 +48,86 @@
     th, td { border: 1px solid #ddd; padding: 6px; text-align: left; }
     th { background-color: #3b82f6; color: white; font-size: 0.8rem; }
     .last-update { font-size: 0.8rem; color: #555; margin-top: 5px; }
-    .controls { margin: 15px 0; display: flex; gap: 10px; align-items: center; }
+    .controls { margin: 15px 0; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
     input, select { padding: 5px; border: 1px solid #ccc; border-radius: 5px; }
   </style>
 </head>
 <body>
 
-  <h1>Dashboard KIB B - DINAS PENDIDIKAN DAN KEBUDAYAAN</h1>
-
-  <div class="controls">
-    <label><b>Filter Kecamatan:</b></label>
-    <select id="filterKecamatan">
-      <option value="all">Semua Kecamatan</option>
-    </select>
-
-    <label><b>Cari Sekolah:</b></label>
-    <input type="text" id="searchBox" placeholder="Ketik nama sekolah...">
+  <div class="navbar">
+  <div style="display:flex; align-items:center; gap:10px;">
+    <img src="https://upload.wikimedia.org/wikipedia/commons/e/e5/Lambang_Kabupaten_Donggala_%282015-sekarang%29.png" alt="Logo" style="height:32px;">
+    <h1>DINAS PENDIDIKAN DAN KEBUDAYAAN</h1>
   </div>
+  <ul>
+    <li><a href="#rekapTable">Rekap Kecamatan</a></li>
+    <li><a href="#sekolahSection">Daftar Sekolah</a></li>
+    <li><a href="#">Tentang</a></li>
+  </ul>
+</div>
 
-  <div class="dashboard">
-    <div class="chart-container">
-      <h2>Rekap Konfirmasi Keberadaan</h2>
-      <canvas id="rekapKonfirmasi"></canvas>
+  <div class="container">
+    <h1>Dashboard Data Aset KIB B - Dinas Pendidikan Dan Kebudayaan</h1>
+
+    <div class="controls">
+      <label><b>Filter Kecamatan:</b></label>
+      <select id="filterKecamatan">
+        <option value="all">Semua Kecamatan</option>
+      </select>
+
+      <label><b>Cari Sekolah:</b></label>
+      <input type="text" id="searchBox" placeholder="Ketik nama sekolah...">
     </div>
-    <div class="chart-container">
-      <h2>Rekap Kondisi Barang</h2>
-      <canvas id="rekapKondisi"></canvas>
+
+    <div class="dashboard">
+      <div class="chart-container">
+        <h2>Rekap Konfirmasi Keberadaan</h2>
+        <canvas id="rekapKonfirmasi"></canvas>
+      </div>
+      <div class="chart-container">
+        <h2>Rekap Kondisi Barang</h2>
+        <canvas id="rekapKondisi"></canvas>
+      </div>
+      <div class="chart-container">
+        <h2>Rekap Nilai Perolehan per Kondisi</h2>
+        <canvas id="rekapNilai"></canvas>
+      </div>
     </div>
-    <div class="chart-container">
-      <h2>Rekap Nilai Perolehan Total</h2>
-      <canvas id="rekapNilai"></canvas>
-    </div>
-    <div class="chart-container">
-      <h2>Nilai Perolehan per Kecamatan</h2>
-      <canvas id="rekapNilaiKecamatan"></canvas>
-    </div>
+
+    <h2>Rekap Per Kecamatan</h2>
+    <div id="lastUpdate" class="last-update">Memuat data...</div>
+    <table id="rekapTable">
+      <thead>
+        <tr>
+          <th>Kecamatan</th>
+          <th>Ditemukan</th>
+          <th>Tidak Ditemukan</th>
+          <th>Baik</th>
+          <th>Rusak Ringan</th>
+          <th>Rusak Berat</th>
+          <th>Nilai Perolehan (Rp)</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+      <tfoot>
+        <tr style="font-weight:bold; background:#e5e7eb;">
+          <td>Total</td>
+          <td id="totalDitemukan">0</td>
+          <td id="totalTidakDitemukan">0</td>
+          <td id="totalBaik">0</td>
+          <td id="totalRusakRingan">0</td>
+          <td id="totalRusakBerat">0</td>
+          <td id="totalNilai">0</td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <div id="sekolahSection"></div>
   </div>
-
-  <h2>Rekap Per Kecamatan</h2>
-  <div id="lastUpdate" class="last-update">Memuat data...</div>
-  <table id="rekapTable">
-    <thead>
-      <tr>
-        <th>Kecamatan</th>
-        <th>Ditemukan</th>
-        <th>Tidak Ditemukan</th>
-        <th>Baik</th>
-        <th>Rusak Ringan</th>
-        <th>Rusak Berat</th>
-        <th>Nilai Perolehan (Rp)</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-    <tfoot>
-      <tr style="font-weight:bold; background:#e5e7eb;">
-        <td>Total</td>
-        <td id="totalDitemukan">0</td>
-        <td id="totalTidakDitemukan">0</td>
-        <td id="totalBaik">0</td>
-        <td id="totalRusakRingan">0</td>
-        <td id="totalRusakBerat">0</td>
-        <td id="totalNilai">0</td>
-      </tr>
-    </tfoot>
-  </table>
-
-  <div id="sekolahSection"></div>
 
   <script>
   const kecamatanEndpoints = {
-    "Banawa": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRd8vIhHDUbmD6I2aXLX7-_Ysemt2aXA__wKNGoKN0XWWSWCScv5aSmx06H0xkl8g/pub?gid=1917777904&single=true&output=csv",
+     "Banawa": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRd8vIhHDUbmD6I2aXLX7-_Ysemt2aXA__wKNGoKN0XWWSWCScv5aSmx06H0xkl8g/pub?gid=1917777904&single=true&output=csv",
     "Banawa Tengah": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRnykw5e_i3dwBIeTua-mpFExEJ4w6hROJ5F6OUHiiGpbtunldeKgXlhN_G-D1V8w/pub?gid=1454720232&single=true&output=csv",
     "Banawa Selatan": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRhDJK33BtCz7KEi6DWgqheZBrcdgK0X9Pw1r28u5ec1MK-I-kP-QOqrsY0G2OnEQ/pub?gid=708970016&single=true&output=csv",
     "Rio Pakava": "https://docs.google.com/spreadsheets/d/1_8YllqyTXGDZZCVeozFKAhGru2WS15Bp/export?format=csv",
@@ -106,7 +145,7 @@
     "Sojol Utara": "https://docs.google.com/spreadsheets/d/e/2PACX-1vT41KwECicPb2EY8d8BP1f73RM3dhVWYDOxpaFlHZluKFy9owLzyVX7N7mIUm37Tw/pub?gid=502544387&single=true&output=csv"
   };
 
-  let chartKonfirmasi, chartKondisi, chartNilai, chartNilaiKecamatan;
+  let chartKonfirmasi, chartKondisi, chartNilai;
 
   async function fetchData(url) {
     return new Promise((resolve) => {
@@ -115,12 +154,10 @@
     });
   }
 
-  function parseNumber(str){
-    if(!str) return 0;
-    let clean = str.toString().trim();
-    clean = clean.replace(/\./g,"").replace(/,/g,"."); 
-    let num = parseFloat(clean);
-    return isNaN(num) ? 0 : num;
+  function parseNumber(value) {
+    if (!value) return 0;
+    if (typeof value === "number") return value;
+    return parseFloat(value.toString().replace(/[^\d,-]/g, "").replace(",", ".") || 0);
   }
 
   async function updateData() {
@@ -132,7 +169,6 @@
     document.getElementById("sekolahSection").innerHTML = "";
 
     let total = { Ditemukan:0, Tidak:0, Baik:0, Ringan:0, Berat:0, Nilai:0 };
-    let nilaiPerKecamatan = {};
 
     for (const [nama, url] of Object.entries(kecamatanEndpoints)) {
       if (filter !== "all" && filter !== nama) continue;
@@ -166,7 +202,6 @@
       total.Ringan+=ringan;
       total.Berat+=berat;
       total.Nilai+=nilai;
-      nilaiPerKecamatan[nama] = nilai;
 
       const tr = document.createElement("tr");
       tr.innerHTML = `<td>${nama}</td>
@@ -208,37 +243,31 @@
 
     document.getElementById("lastUpdate").textContent = "Data terakhir diperbarui: " + new Date().toLocaleTimeString();
 
-    updateCharts(total, nilaiPerKecamatan);
+    updateCharts(total);
   }
 
-  function updateCharts(total, nilaiPerKecamatan){
+  function updateCharts(total){
+    const ctx1 = document.getElementById("rekapKonfirmasi").getContext("2d");
+    const ctx2 = document.getElementById("rekapKondisi").getContext("2d");
+    const ctx3 = document.getElementById("rekapNilai").getContext("2d");
+
     if(chartKonfirmasi) chartKonfirmasi.destroy();
     if(chartKondisi) chartKondisi.destroy();
     if(chartNilai) chartNilai.destroy();
-    if(chartNilaiKecamatan) chartNilaiKecamatan.destroy();
 
-    chartKonfirmasi = new Chart(document.getElementById("rekapKonfirmasi"),{
+    chartKonfirmasi = new Chart(ctx1,{
       type:"pie",
       data:{labels:["Ditemukan","Tidak Ditemukan"],datasets:[{data:[total.Ditemukan,total.Tidak]}]}
     });
 
-    chartKondisi = new Chart(document.getElementById("rekapKondisi"),{
+    chartKondisi = new Chart(ctx2,{
       type:"bar",
       data:{labels:["Baik","Rusak Ringan","Rusak Berat"],datasets:[{data:[total.Baik,total.Ringan,total.Berat]}]}
     });
 
-    chartNilai = new Chart(document.getElementById("rekapNilai"),{
+    chartNilai = new Chart(ctx3,{
       type:"doughnut",
       data:{labels:["Nilai Barang"],datasets:[{data:[total.Nilai]}]}
-    });
-
-    chartNilaiKecamatan = new Chart(document.getElementById("rekapNilaiKecamatan"),{
-      type:"bar",
-      data:{
-        labels:Object.keys(nilaiPerKecamatan),
-        datasets:[{label:"Nilai Perolehan (Rp)",data:Object.values(nilaiPerKecamatan)}]
-      },
-      options:{scales:{y:{ticks:{callback: v=> v.toLocaleString("id-ID") }}}}
     });
   }
 
@@ -256,6 +285,12 @@
   updateData();
   setInterval(updateData, 300000);
   </script>
+
+ <!-- Footer -->
+  <footer>
+    <p>&copy; 2025 DINAS PENDIDIKAN DAN KEBUDAYAAN - Semua Hak Dilindungi.</p>
+    <p id="about">Dibuat untuk monitoring KIB B secara digital dan transparan.</p>
+  </footer>
 
 </body>
 </html>
