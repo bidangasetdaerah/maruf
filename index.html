@@ -70,7 +70,7 @@
 
   <div id="sekolahSection"></div>
 
-  <script>
+<script>
   const kecamatanEndpoints = {
     "Banawa": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRd8vIhHDUbmD6I2aXLX7-_Ysemt2aXA__wKNGoKN0XWWSWCScv5aSmx06H0xkl8g/pub?gid=1917777904&single=true&output=csv",
     "Banawa Tengah": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRnykw5e_i3dwBIeTua-mpFExEJ4w6hROJ5F6OUHiiGpbtunldeKgXlhN_G-D1V8w/pub?gid=1454720232&single=true&output=csv",
@@ -120,7 +120,7 @@
         const k = row["Konfirmasi Keberadaan"] || "Tidak Ditemukan";
         const c = row["Kondisi"] || "Baik";
         const v = parseFloat(row["Harga Perolehan"] || row["Nilai Perolehan"] || 0);
-        const sekolah = row["Nama Sekolah"] || row["Sekolah"] || "";
+        const sekolah = row["Pengguna Barang"]?.trim() || "Tidak Ada Nama";
 
         if(k==="Ditemukan") ditemukan++; else tidak++;
         if(c==="Baik") baik++;
@@ -128,6 +128,7 @@
         else if(c==="Rusak Berat") berat++;
         nilai += v;
 
+        // Gabungkan data per sekolah
         if(sekolah){
           if(!sekolahMap[sekolah]) sekolahMap[sekolah] = { barang:0, nilai:0 };
           sekolahMap[sekolah].barang++;
@@ -153,13 +154,16 @@
                       <td>${nilai.toLocaleString("id-ID")}</td>`;
       tbody.appendChild(tr);
 
-      // buat tabel sekolah per kecamatan
+      // buat tabel sekolah per kecamatan + search box
       const section = document.getElementById("sekolahSection");
       let html = `<h3>Daftar Sekolah - ${nama}</h3>
-                  <table>
+                  <input type="text" placeholder="Cari sekolah..." 
+                         onkeyup="filterSekolah(this, '${nama}')" 
+                         style="margin:5px 0;padding:4px;width:100%;max-width:300px;">
+                  <table id="table-${nama}">
                     <thead>
                       <tr>
-                        <th>Nama Sekolah</th>
+                        <th>Nama Sekolah (Pengguna Barang)</th>
                         <th>Jumlah Barang</th>
                         <th>Nilai Perolehan (Rp)</th>
                       </tr>
@@ -198,9 +202,22 @@
     document.getElementById("lastUpdate").textContent = "Data terakhir diperbarui: " + new Date().toLocaleTimeString();
   }
 
+  // fungsi filter sekolah per tabel
+  function filterSekolah(input, kecamatan) {
+    const filter = input.value.toLowerCase();
+    const table = document.getElementById(`table-${kecamatan}`);
+    const trs = table.querySelectorAll("tbody tr");
+
+    trs.forEach(tr => {
+      const namaSekolah = tr.cells[0].textContent.toLowerCase();
+      tr.style.display = namaSekolah.includes(filter) ? "" : "none";
+    });
+  }
+
   updateData();
   setInterval(updateData, 300000);
-  </script>
+</script>
+
 
 </body>
 </html>
