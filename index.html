@@ -10,6 +10,7 @@
     body { font-family: sans-serif; margin: 10px; background-color: #f9fafb; }
     h1 { font-size: 1.5rem; margin-bottom: 10px; text-align: center; }
     h2 { font-size: 1.2rem; margin-top: 20px; }
+    h3 { font-size: 1rem; margin-top: 15px; color: #1f2937; }
     .dashboard { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 15px; }
     .chart-container, table { background: white; border-radius: 8px; padding: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
     .chart-container { flex: 1 1 300px; }
@@ -18,7 +19,6 @@
     th, td { border: 1px solid #ddd; padding: 6px; text-align: left; }
     th { background-color: #3b82f6; color: white; font-size: 0.8rem; }
     .last-update { font-size: 0.8rem; color: #555; margin-top: 5px; }
-    select { padding: 5px; margin-top: 5px; }
   </style>
 </head>
 <body>
@@ -68,39 +68,11 @@
     </tfoot>
   </table>
 
-  <h2>Daftar Sekolah</h2>
-  <label for="filterKecamatan">Filter Kecamatan: </label>
-  <select id="filterKecamatan">
-    <option value="all">Semua Kecamatan</option>
-  </select>
-
-  <table id="sekolahTable">
-    <thead>
-      <tr>
-        <th>Kecamatan</th>
-        <th>Nama Sekolah</th>
-        <th>Jumlah Barang</th>
-        <th>Nilai Perolehan (Rp)</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-    <tfoot>
-      <tr style="font-weight:bold; background:#e5e7eb;">
-        <td colspan="2">Total</td>
-        <td id="totalBarang">0</td>
-        <td id="totalNilaiSekolah">0</td>
-      </tr>
-    </tfoot>
-  </table>
-
-  <div class="chart-container" style="margin-top:20px;">
-    <h2>Grafik Nilai Perolehan per Sekolah</h2>
-    <canvas id="grafikSekolah"></canvas>
-  </div>
+  <div id="sekolahSection"></div>
 
   <script>
   const kecamatanEndpoints = {
-   "Banawa": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRd8vIhHDUbmD6I2aXLX7-_Ysemt2aXA__wKNGoKN0XWWSWCScv5aSmx06H0xkl8g/pub?gid=1917777904&single=true&output=csv",
+    "Banawa": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRd8vIhHDUbmD6I2aXLX7-_Ysemt2aXA__wKNGoKN0XWWSWCScv5aSmx06H0xkl8g/pub?gid=1917777904&single=true&output=csv",
     "Banawa Tengah": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRnykw5e_i3dwBIeTua-mpFExEJ4w6hROJ5F6OUHiiGpbtunldeKgXlhN_G-D1V8w/pub?gid=1454720232&single=true&output=csv",
     "Banawa Selatan": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRhDJK33BtCz7KEi6DWgqheZBrcdgK0X9Pw1r28u5ec1MK-I-kP-QOqrsY0G2OnEQ/pub?gid=708970016&single=true&output=csv",
     "Rio Pakava": "https://docs.google.com/spreadsheets/d/1_8YllqyTXGDZZCVeozFKAhGru2WS15Bp/export?format=csv",
@@ -118,8 +90,7 @@
     "Sojol Utara": "https://docs.google.com/spreadsheets/d/e/2PACX-1vT41KwECicPb2EY8d8BP1f73RM3dhVWYDOxpaFlHZluKFy9owLzyVX7N7mIUm37Tw/pub?gid=502544387&single=true&output=csv"
   };
 
-  let chartKonfirmasi, chartKondisi, chartNilai, chartSekolah;
-  let sekolahGlobal = []; // simpan semua sekolah
+  let sekolahGlobal = [];
 
   async function fetchData(url) {
     return new Promise((resolve) => {
@@ -135,10 +106,10 @@
   async function updateData() {
     const tbody = document.querySelector("#rekapTable tbody");
     tbody.innerHTML = "";
+    document.getElementById("sekolahSection").innerHTML = "";
 
     sekolahGlobal = [];
     let total = { Ditemukan:0, Tidak:0, Baik:0, Ringan:0, Berat:0, Nilai:0 };
-    let nilaiKondisi = { Baik:0, Ringan:0, Berat:0 };
 
     for (const [nama, url] of Object.entries(kecamatanEndpoints)) {
       const data = await fetchData(url);
@@ -152,9 +123,9 @@
         const sekolah = row["Nama Sekolah"] || row["Sekolah"] || "";
 
         if(k==="Ditemukan") ditemukan++; else tidak++;
-        if(c==="Baik") { baik++; nilaiKondisi.Baik+=v; }
-        else if(c==="Rusak Ringan") { ringan++; nilaiKondisi.Ringan+=v; }
-        else if(c==="Rusak Berat") { berat++; nilaiKondisi.Berat+=v; }
+        if(c==="Baik") baik++;
+        else if(c==="Rusak Ringan") ringan++;
+        else if(c==="Rusak Berat") berat++;
         nilai += v;
 
         if(sekolah){
@@ -171,6 +142,7 @@
       total.Berat+=berat;
       total.Nilai+=nilai;
 
+      // isi tabel rekap
       const tr = document.createElement("tr");
       tr.innerHTML = `<td>${nama}</td>
                       <td>${ditemukan}</td>
@@ -181,12 +153,41 @@
                       <td>${nilai.toLocaleString("id-ID")}</td>`;
       tbody.appendChild(tr);
 
+      // buat tabel sekolah per kecamatan
+      const section = document.getElementById("sekolahSection");
+      let html = `<h3>Daftar Sekolah - ${nama}</h3>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Nama Sekolah</th>
+                        <th>Jumlah Barang</th>
+                        <th>Nilai Perolehan (Rp)</th>
+                      </tr>
+                    </thead>
+                    <tbody>`;
+      let totalBarang=0, totalNilai=0;
       for(const [sekolah, val] of Object.entries(sekolahMap)){
-        sekolahGlobal.push({ kecamatan:nama, sekolah, barang:val.barang, nilai:val.nilai });
+        html += `<tr>
+                  <td>${sekolah}</td>
+                  <td>${val.barang}</td>
+                  <td>${val.nilai.toLocaleString("id-ID")}</td>
+                 </tr>`;
+        totalBarang += val.barang;
+        totalNilai += val.nilai;
       }
+      html += `</tbody>
+               <tfoot>
+                 <tr style="font-weight:bold; background:#e5e7eb;">
+                   <td>Total</td>
+                   <td>${totalBarang}</td>
+                   <td>${totalNilai.toLocaleString("id-ID")}</td>
+                 </tr>
+               </tfoot>
+              </table>`;
+      section.innerHTML += html;
     }
 
-    // update total kecamatan
+    // update total kabupaten
     document.getElementById("totalDitemukan").textContent = total.Ditemukan;
     document.getElementById("totalTidakDitemukan").textContent = total.Tidak;
     document.getElementById("totalBaik").textContent = total.Baik;
@@ -195,55 +196,7 @@
     document.getElementById("totalNilai").textContent = total.Nilai.toLocaleString("id-ID");
 
     document.getElementById("lastUpdate").textContent = "Data terakhir diperbarui: " + new Date().toLocaleTimeString();
-
-    // isi dropdown kecamatan
-    const select = document.getElementById("filterKecamatan");
-    select.innerHTML = `<option value="all">Semua Kecamatan</option>`;
-    Object.keys(kecamatanEndpoints).forEach(kec=>{
-      const opt = document.createElement("option");
-      opt.value = kec; opt.textContent = kec;
-      select.appendChild(opt);
-    });
-
-    renderSekolahTable("all");
   }
-
-  function renderSekolahTable(filter) {
-    const tbody = document.querySelector("#sekolahTable tbody");
-    tbody.innerHTML = "";
-    let totalBarang=0, totalNilai=0;
-    let dataFilter = sekolahGlobal.filter(s=> filter==="all" || s.kecamatan===filter);
-
-    dataFilter.forEach(s=>{
-      const tr = document.createElement("tr");
-      tr.innerHTML = `<td>${s.kecamatan}</td>
-                      <td>${s.sekolah}</td>
-                      <td>${s.barang}</td>
-                      <td>${s.nilai.toLocaleString("id-ID")}</td>`;
-      tbody.appendChild(tr);
-      totalBarang += s.barang;
-      totalNilai += s.nilai;
-    });
-
-    document.getElementById("totalBarang").textContent = totalBarang;
-    document.getElementById("totalNilaiSekolah").textContent = totalNilai.toLocaleString("id-ID");
-
-    // update grafik bar sekolah
-    const ctx = document.getElementById("grafikSekolah").getContext("2d");
-    if(chartSekolah) chartSekolah.destroy();
-    chartSekolah = new Chart(ctx, {
-      type:"bar",
-      data:{
-        labels:dataFilter.map(s=>s.sekolah),
-        datasets:[{ label:"Nilai Perolehan (Rp)", data:dataFilter.map(s=>s.nilai), backgroundColor:"#3b82f6" }]
-      },
-      options:{ plugins:{ tooltip:{ callbacks:{ label:ctx=>"Rp "+ctx.raw.toLocaleString("id-ID") } } }, scales:{ y:{ beginAtZero:true } } }
-    });
-  }
-
-  document.getElementById("filterKecamatan").addEventListener("change", e=>{
-    renderSekolahTable(e.target.value);
-  });
 
   updateData();
   setInterval(updateData, 300000);
