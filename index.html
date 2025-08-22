@@ -19,35 +19,23 @@
     th, td { border: 1px solid #ddd; padding: 6px; text-align: left; }
     th { background-color: #3b82f6; color: white; font-size: 0.8rem; }
     .last-update { font-size: 0.8rem; color: #555; margin-top: 5px; }
-    .controls { margin: 15px 0; display: flex; gap: 10px; align-items: center; }
-    input, select { padding: 5px; border: 1px solid #ccc; border-radius: 5px; }
   </style>
 </head>
 <body>
 
   <h1>Dashboard KIB B - DINAS PENDIDIKAN DAN KEBUDAYAAN</h1>
 
-  <div class="controls">
-    <label><b>Filter Kecamatan:</b></label>
-    <select id="filterKecamatan">
-      <option value="all">Semua Kecamatan</option>
-    </select>
-
-    <label><b>Cari Sekolah:</b></label>
-    <input type="text" id="searchBox" placeholder="Ketik nama sekolah...">
-  </div>
-
   <div class="dashboard">
     <div class="chart-container">
-      <h2>Rekap Konfirmasi Keberadaan</h2>
+      <h2>Rekap Konfirmasi Keberadaan (Kabupaten)</h2>
       <canvas id="rekapKonfirmasi"></canvas>
     </div>
     <div class="chart-container">
-      <h2>Rekap Kondisi Barang</h2>
+      <h2>Rekap Kondisi Barang (Kabupaten)</h2>
       <canvas id="rekapKondisi"></canvas>
     </div>
     <div class="chart-container">
-      <h2>Rekap Nilai Perolehan per Kondisi</h2>
+      <h2>Rekap Nilai Perolehan per Kondisi (Kabupaten)</h2>
       <canvas id="rekapNilai"></canvas>
     </div>
   </div>
@@ -102,28 +90,34 @@
     "Sojol Utara": "https://docs.google.com/spreadsheets/d/e/2PACX-1vT41KwECicPb2EY8d8BP1f73RM3dhVWYDOxpaFlHZluKFy9owLzyVX7N7mIUm37Tw/pub?gid=502544387&single=true&output=csv"
   };
 
-  let chartKonfirmasi, chartKondisi, chartNilai;
+  let sekolahGlobal = [];
+
+  // fungsi untuk parsing angka Indonesia
+  function parseRupiah(val) {
+    if (!val) return 0;
+    return parseFloat(val.toString().replace(/\./g, "").replace(",", "."));
+  }
 
   async function fetchData(url) {
     return new Promise((resolve) => {
       if (!url) return resolve([]);
-      Papa.parse(url, { download: true, header: true, complete: (res) => resolve(res.data) });
+      Papa.parse(url, {
+        download: true,
+        header: true,
+        complete: (results) => resolve(results.data)
+      });
     });
   }
 
   async function updateData() {
-    const filter = document.getElementById("filterKecamatan").value;
-    const search = document.getElementById("searchBox").value.toLowerCase();
-
     const tbody = document.querySelector("#rekapTable tbody");
     tbody.innerHTML = "";
     document.getElementById("sekolahSection").innerHTML = "";
 
+    sekolahGlobal = [];
     let total = { Ditemukan:0, Tidak:0, Baik:0, Ringan:0, Berat:0, Nilai:0 };
 
     for (const [nama, url] of Object.entries(kecamatanEndpoints)) {
-      if (filter !== "all" && filter !== nama) continue;
-
       const data = await fetchData(url);
       let ditemukan=0, tidak=0, baik=0, ringan=0, berat=0, nilai=0;
       const sekolahMap = {};
@@ -131,8 +125,8 @@
       data.forEach(row=>{
         const k = row["Konfirmasi Keberadaan"] || "Tidak Ditemukan";
         const c = row["Kondisi"] || "Baik";
-        const v = parseFloat(row["Harga Perolehan"] || row["Nilai Perolehan"] || 0);
-        const sekolah = row["Pengguna Barang"] || row["Nama Sekolah"] || "";
+        const v = parseRupiah(row["Harga Perolehan"] || row["Nilai Perolehan"] || 0);
+        const sekolah = row["Nama Sekolah"] || row["Sekolah"] || row["Pengguna Barang"] || "";
 
         if(k==="Ditemukan") ditemukan++; else tidak++;
         if(c==="Baik") baik++;
@@ -165,25 +159,37 @@
                       <td>${nilai.toLocaleString("id-ID")}</td>`;
       tbody.appendChild(tr);
 
-      // tabel sekolah
+      // buat tabel sekolah per kecamatan
       const section = document.getElementById("sekolahSection");
       let html = `<h3>Daftar Sekolah - ${nama}</h3>
                   <table>
                     <thead>
-                      <tr><th>Nama Sekolah</th><th>Jumlah Barang</th><th>Nilai Perolehan (Rp)</th></tr>
+                      <tr>
+                        <th>Nama Sekolah</th>
+                        <th>Jumlah Barang</th>
+                        <th>Nilai Perolehan (Rp)</th>
+                      </tr>
                     </thead>
                     <tbody>`;
       let totalBarang=0, totalNilai=0;
       for(const [sekolah, val] of Object.entries(sekolahMap)){
-        if(search && !sekolah.toLowerCase().includes(search)) continue;
-        html += `<tr><td>${sekolah}</td><td>${val.barang}</td><td>${val.nilai.toLocaleString("id-ID")}</td></tr>`;
+        html += `<tr>
+                  <td>${sekolah}</td>
+                  <td>${val.barang}</td>
+                  <td>${val.nilai.toLocaleString("id-ID")}</td>
+                 </tr>`;
         totalBarang += val.barang;
         totalNilai += val.nilai;
       }
       html += `</tbody>
-               <tfoot><tr style="font-weight:bold; background:#e5e7eb;">
-                 <td>Total</td><td>${totalBarang}</td><td>${totalNilai.toLocaleString("id-ID")}</td>
-               </tr></tfoot></table>`;
+               <tfoot>
+                 <tr style="font-weight:bold; background:#e5e7eb;">
+                   <td>Total</td>
+                   <td>${totalBarang}</td>
+                   <td>${totalNilai.toLocaleString("id-ID")}</td>
+                 </tr>
+               </tfoot>
+              </table>`;
       section.innerHTML += html;
     }
 
@@ -196,46 +202,7 @@
     document.getElementById("totalNilai").textContent = total.Nilai.toLocaleString("id-ID");
 
     document.getElementById("lastUpdate").textContent = "Data terakhir diperbarui: " + new Date().toLocaleTimeString();
-
-    updateCharts(total);
   }
-
-  function updateCharts(total){
-    const ctx1 = document.getElementById("rekapKonfirmasi").getContext("2d");
-    const ctx2 = document.getElementById("rekapKondisi").getContext("2d");
-    const ctx3 = document.getElementById("rekapNilai").getContext("2d");
-
-    if(chartKonfirmasi) chartKonfirmasi.destroy();
-    if(chartKondisi) chartKondisi.destroy();
-    if(chartNilai) chartNilai.destroy();
-
-    chartKonfirmasi = new Chart(ctx1,{
-      type:"pie",
-      data:{labels:["Ditemukan","Tidak Ditemukan"],datasets:[{data:[total.Ditemukan,total.Tidak]}]}
-    });
-
-    chartKondisi = new Chart(ctx2,{
-      type:"bar",
-      data:{labels:["Baik","Rusak Ringan","Rusak Berat"],datasets:[{data:[total.Baik,total.Ringan,total.Berat]}]}
-    });
-
-    chartNilai = new Chart(ctx3,{
-      type:"doughnut",
-      data:{labels:["Nilai Barang"],datasets:[{data:[total.Nilai]}]}
-    });
-  }
-
-  // isi dropdown kecamatan
-  const filterSelect = document.getElementById("filterKecamatan");
-  for (const nama of Object.keys(kecamatanEndpoints)) {
-    const opt = document.createElement("option");
-    opt.value = nama;
-    opt.textContent = nama;
-    filterSelect.appendChild(opt);
-  }
-
-  filterSelect.addEventListener("change", updateData);
-  document.getElementById("searchBox").addEventListener("input", updateData);
 
   updateData();
   setInterval(updateData, 300000);
