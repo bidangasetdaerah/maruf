@@ -90,7 +90,7 @@
     "Sojol Utara": "https://docs.google.com/spreadsheets/d/e/2PACX-1vT41KwECicPb2EY8d8BP1f73RM3dhVWYDOxpaFlHZluKFy9owLzyVX7N7mIUm37Tw/pub?gid=502544387&single=true&output=csv"
   };
 
-  let sekolahGlobal = [];
+  let totalKabupaten = { Ditemukan:0, Tidak:0, Baik:0, Ringan:0, Berat:0, Nilai:0 };
 
   async function fetchData(url) {
     return new Promise((resolve) => {
@@ -108,8 +108,7 @@
     tbody.innerHTML = "";
     document.getElementById("sekolahSection").innerHTML = "";
 
-    sekolahGlobal = [];
-    let total = { Ditemukan:0, Tidak:0, Baik:0, Ringan:0, Berat:0, Nilai:0 };
+    totalKabupaten = { Ditemukan:0, Tidak:0, Baik:0, Ringan:0, Berat:0, Nilai:0 };
 
     for (const [nama, url] of Object.entries(kecamatanEndpoints)) {
       const data = await fetchData(url);
@@ -120,7 +119,7 @@
         const k = row["Konfirmasi Keberadaan"] || "Tidak Ditemukan";
         const c = row["Kondisi"] || "Baik";
         const v = parseFloat(row["Harga Perolehan"] || row["Nilai Perolehan"] || 0);
-        const sekolah = row["Status Penggunaan"]?.trim() || "Tidak Ada Nama";
+        const sekolah = row["Pengguna Barang"]?.trim() || "Tidak Ada Nama";
 
         if(k==="Ditemukan") ditemukan++; else tidak++;
         if(c==="Baik") baik++;
@@ -128,7 +127,6 @@
         else if(c==="Rusak Berat") berat++;
         nilai += v;
 
-        // Gabungkan data per sekolah
         if(sekolah){
           if(!sekolahMap[sekolah]) sekolahMap[sekolah] = { barang:0, nilai:0 };
           sekolahMap[sekolah].barang++;
@@ -136,14 +134,13 @@
         }
       });
 
-      total.Ditemukan+=ditemukan;
-      total.Tidak+=tidak;
-      total.Baik+=baik;
-      total.Ringan+=ringan;
-      total.Berat+=berat;
-      total.Nilai+=nilai;
+      totalKabupaten.Ditemukan+=ditemukan;
+      totalKabupaten.Tidak+=tidak;
+      totalKabupaten.Baik+=baik;
+      totalKabupaten.Ringan+=ringan;
+      totalKabupaten.Berat+=berat;
+      totalKabupaten.Nilai+=nilai;
 
-      // isi tabel rekap
       const tr = document.createElement("tr");
       tr.innerHTML = `<td>${nama}</td>
                       <td>${ditemukan}</td>
@@ -154,13 +151,9 @@
                       <td>${nilai.toLocaleString("id-ID")}</td>`;
       tbody.appendChild(tr);
 
-      // buat tabel sekolah per kecamatan + search box
       const section = document.getElementById("sekolahSection");
       let html = `<h3>Daftar Sekolah - ${nama}</h3>
-                  <input type="text" placeholder="Cari sekolah..." 
-                         onkeyup="filterSekolah(this, '${nama}')" 
-                         style="margin:5px 0;padding:4px;width:100%;max-width:300px;">
-                  <table id="table-${nama}">
+                  <table class="table-sekolah">
                     <thead>
                       <tr>
                         <th>Nama Sekolah (Pengguna Barang)</th>
@@ -192,25 +185,65 @@
     }
 
     // update total kabupaten
-    document.getElementById("totalDitemukan").textContent = total.Ditemukan;
-    document.getElementById("totalTidakDitemukan").textContent = total.Tidak;
-    document.getElementById("totalBaik").textContent = total.Baik;
-    document.getElementById("totalRusakRingan").textContent = total.Ringan;
-    document.getElementById("totalRusakBerat").textContent = total.Berat;
-    document.getElementById("totalNilai").textContent = total.Nilai.toLocaleString("id-ID");
+    document.getElementById("totalDitemukan").textContent = totalKabupaten.Ditemukan;
+    document.getElementById("totalTidakDitemukan").textContent = totalKabupaten.Tidak;
+    document.getElementById("totalBaik").textContent = totalKabupaten.Baik;
+    document.getElementById("totalRusakRingan").textContent = totalKabupaten.Ringan;
+    document.getElementById("totalRusakBerat").textContent = totalKabupaten.Berat;
+    document.getElementById("totalNilai").textContent = totalKabupaten.Nilai.toLocaleString("id-ID");
 
     document.getElementById("lastUpdate").textContent = "Data terakhir diperbarui: " + new Date().toLocaleTimeString();
+
+    // update grafik kabupaten
+    updateCharts();
   }
 
-  // fungsi filter sekolah per tabel
-  function filterSekolah(input, kecamatan) {
-    const filter = input.value.toLowerCase();
-    const table = document.getElementById(`table-${kecamatan}`);
-    const trs = table.querySelectorAll("tbody tr");
-
-    trs.forEach(tr => {
+  // fungsi filter global
+  function filterGlobal() {
+    const filter = document.getElementById("globalSearch").value.toLowerCase();
+    document.querySelectorAll(".table-sekolah tbody tr").forEach(tr => {
       const namaSekolah = tr.cells[0].textContent.toLowerCase();
       tr.style.display = namaSekolah.includes(filter) ? "" : "none";
+    });
+  }
+
+  // update grafik kabupaten
+  let chartKonfirmasi, chartKondisi, chartNilai;
+  function updateCharts() {
+    const ctx1 = document.getElementById("rekapKonfirmasi").getContext("2d");
+    const ctx2 = document.getElementById("rekapKondisi").getContext("2d");
+    const ctx3 = document.getElementById("rekapNilai").getContext("2d");
+
+    if(chartKonfirmasi) chartKonfirmasi.destroy();
+    if(chartKondisi) chartKondisi.destroy();
+    if(chartNilai) chartNilai.destroy();
+
+    chartKonfirmasi = new Chart(ctx1, {
+      type: "doughnut",
+      data: {
+        labels: ["Ditemukan", "Tidak Ditemukan"],
+        datasets: [{ data: [totalKabupaten.Ditemukan, totalKabupaten.Tidak] }]
+      }
+    });
+
+    chartKondisi = new Chart(ctx2, {
+      type: "doughnut",
+      data: {
+        labels: ["Baik", "Rusak Ringan", "Rusak Berat"],
+        datasets: [{ data: [totalKabupaten.Baik, totalKabupaten.Ringan, totalKabupaten.Berat] }]
+      }
+    });
+
+    chartNilai = new Chart(ctx3, {
+      type: "bar",
+      data: {
+        labels: ["Baik", "Rusak Ringan", "Rusak Berat"],
+        datasets: [{
+          label: "Nilai Perolehan (Rp)",
+          data: [totalKabupaten.Baik, totalKabupaten.Ringan, totalKabupaten.Berat]
+        }]
+      },
+      options: { responsive: true, plugins: { legend: { display: false } } }
     });
   }
 
