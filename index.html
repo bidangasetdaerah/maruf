@@ -120,7 +120,7 @@
         const k = row["Konfirmasi Keberadaan"] || "Tidak Ditemukan";
         const c = row["Kondisi"] || "Baik";
         const v = parseFloat(row["Harga Perolehan"] || row["Nilai Perolehan"] || 0);
-        const sekolah = row["Pengguna Barang"]?.trim() || "Tidak Ada Nama";
+        const sekolah = row["Status Penggunaan"]?.trim() || "Tidak Ada Nama";
 
         if(k==="Ditemukan") ditemukan++; else tidak++;
         if(c==="Baik") baik++;
