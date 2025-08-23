@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Rekap Kecamatan – Data dari Google Sheets</title>
+  <title>Rekap Data Aset Satuan Pendidikan</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -15,9 +15,9 @@
 </head>
 <body class="bg-gray-50 text-gray-800 min-h-screen">
   <div class="max-w-7xl mx-auto p-4 md:p-6">
-    <header class="flex items-center justify-between gap-4 mb-4">
-      <h1 class="text-2xl md:text-3xl font-bold">Rekap Kecamatan</h1>
-      <div class="flex items-center gap-2">
+    <header class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-4">
+      <h1 class="text-2xl md:text-3xl font-bold">Daftar Total KIB B Dinas Pendidikan dan Kebudayaan</h1>
+      <div class="flex flex-wrap gap-2">
         <button id="refreshBtn" class="px-3 py-2 rounded-xl bg-blue-600 text-white shadow hover:bg-blue-700">Muat Ulang</button>
         <button id="downloadCsvBtn" class="px-3 py-2 rounded-xl bg-gray-800 text-white shadow hover:bg-black">Unduh CSV</button>
         <button id="printBtn" class="px-3 py-2 rounded-xl bg-green-600 text-white shadow hover:bg-green-700">Cetak / PDF</button>
@@ -33,20 +33,20 @@
 
     <div id="status" class="text-sm text-gray-600 mb-2">Siap memuat data...</div>
 
-    <div class="border rounded-2xl bg-white shadow mb-6">
+    <div class="border rounded-2xl bg-white shadow mb-6 overflow-x-auto">
       <div class="scroll-area">
         <table id="dataTable" class="min-w-full table-auto">
           <thead id="tableHead"></thead>
           <tbody id="tableBody"></tbody>
         </table>
       </div>
-      <div class="flex items-center justify-between p-3 border-t">
+      <div class="flex flex-col md:flex-row items-center justify-between p-3 border-t gap-2">
         <div class="text-sm text-gray-600"><span id="countShown">0</span> / <span id="countTotal">0</span> baris ditampilkan</div>
-        <div class="flex gap-2 items-center">
+        <div class="flex flex-wrap gap-2 items-center">
           <button id="prevPage" class="px-3 py-1 rounded-lg border">Prev</button>
           <span id="pageInfo" class="text-sm"></span>
           <button id="nextPage" class="px-3 py-1 rounded-lg border">Next</button>
-          <label class="text-sm ml-3">Baris/halaman
+          <label class="text-sm">Baris/halaman
             <select id="pageSize" class="ml-2 border rounded-lg px-2 py-1">
               <option>10</option>
               <option selected>25</option>
@@ -58,9 +58,22 @@
       </div>
     </div>
 
-    <div class="bg-white p-4 rounded-2xl shadow">
-      <h2 class="text-lg font-semibold mb-2">Grafik Ringkasan</h2>
-      <canvas id="summaryChart" height="120"></canvas>
+    <!-- total keseluruhan -->
+    <div class="bg-white p-4 rounded-2xl shadow mb-6">
+      <h2 class="text-lg font-semibold mb-2">Total Keseluruhan</h2>
+      <p class="text-xl font-bold text-blue-600" id="grandTotal">0</p>
+    </div>
+
+    <!-- grafik -->
+    <div class="grid md:grid-cols-2 gap-6">
+      <div class="bg-white p-4 rounded-2xl shadow">
+        <h2 class="text-lg font-semibold mb-2">Grafik Bar per Kecamatan</h2>
+        <canvas id="summaryChart" height="200"></canvas>
+      </div>
+      <div class="bg-white p-4 rounded-2xl shadow">
+        <h2 class="text-lg font-semibold mb-2">Distribusi Pie</h2>
+        <canvas id="pieChart" height="200"></canvas>
+      </div>
     </div>
   </div>
 
@@ -80,6 +93,8 @@
       countShown: document.getElementById('countShown'),
       countTotal: document.getElementById('countTotal'),
       chart: document.getElementById('summaryChart'),
+      pie: document.getElementById('pieChart'),
+      grandTotal: document.getElementById('grandTotal')
     };
 
     let rawData = [];
@@ -88,6 +103,7 @@
     let sortState = { key: null, dir: 'asc' };
     let currentPage = 1;
     let chartInstance;
+    let pieInstance;
 
     function buildCsvUrl() {
       const id = "1BUphKQVnCyECmkhUu7J1_GrOLIw3FawsDyK3RkZlnVI";
@@ -208,6 +224,8 @@
       els.tableBody.appendChild(frag);
 
       renderChart(rows);
+      renderPie(rows);
+      renderGrandTotal(rows);
       els.status.textContent = 'Selesai memuat.';
     }
 
@@ -221,20 +239,58 @@
       renderBody();
     }
 
-    function renderChart(rows) {
-      if (!rows.length) return;
-      const labelKey = headers[0];
+    function renderGrandTotal(rows) {
       const valueKey = headers.find(h => h.toLowerCase().includes('jumlah') || h.toLowerCase().includes('total'));
       if (!valueKey) return;
+      const total = rows.reduce((sum, r) => sum + (parseFloat(r[valueKey]) || 0), 0);
+      els.grandTotal.textContent = total.toLocaleString('id-ID');
+    }
 
-      const labels = rows.map(r => r[labelKey]);
-      const values = rows.map(r => parseFloat(r[valueKey]) || 0);
+    function renderChart(rows) {
+      if (!rows.length) return;
+      const kecKey = headers.find(h => h.toLowerCase().includes('kecamatan'));
+      const valueKey = headers.find(h => h.toLowerCase().includes('jumlah') || h.toLowerCase().includes('total'));
+      if (!kecKey || !valueKey) return;
+
+      const agg = {};
+      rows.forEach(r => {
+        const kec = r[kecKey] || 'Tanpa Nama';
+        const val = parseFloat(r[valueKey]) || 0;
+        agg[kec] = (agg[kec] || 0) + val;
+      });
+
+      const labels = Object.keys(agg);
+      const values = Object.values(agg);
 
       if (chartInstance) chartInstance.destroy();
       chartInstance = new Chart(els.chart, {
         type: 'bar',
-        data: { labels, datasets: [{ label: valueKey, data: values }] },
-        options: { responsive: true, plugins: { legend: { display: false } } }
+        data: { labels, datasets: [{ label: 'Jumlah', data: values, backgroundColor: 'rgba(37,99,235,0.6)' }] },
+        options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { autoSkip: false } } } }
+      });
+    }
+
+    function renderPie(rows) {
+      if (!rows.length) return;
+      const kecKey = headers.find(h => h.toLowerCase().includes('kecamatan'));
+      const valueKey = headers.find(h => h.toLowerCase().includes('jumlah') || h.toLowerCase().includes('total'));
+      if (!kecKey || !valueKey) return;
+
+      const agg = {};
+      rows.forEach(r => {
+        const kec = r[kecKey] || 'Tanpa Nama';
+        const val = parseFloat(r[valueKey]) || 0;
+        agg[kec] = (agg[kec] || 0) + val;
+      });
+
+      const labels = Object.keys(agg);
+      const values = Object.values(agg);
+
+      if (pieInstance) pieInstance.destroy();
+      pieInstance = new Chart(els.pie, {
+        type: 'pie',
+        data: { labels, datasets: [{ data: values }] },
+        options: { responsive: true }
       });
     }
 
