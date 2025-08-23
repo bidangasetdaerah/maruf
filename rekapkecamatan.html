@@ -13,6 +13,11 @@
 <h1 class="text-2xl md:text-3xl font-bold mb-2">KIB B Peralatan Dan Mesin Dinas Pendidikan dan Kebudayaan</h1>
 <h2 class="text-xl font-semibold mb-4">📊 Data Nilai Aset Sekolah per Kecamatan</h2>
 
+<!-- Total keseluruhan -->
+<div class="bg-green-100 text-green-800 p-3 rounded mb-4">
+  <strong>Total Keseluruhan Nilai Perolehan: </strong> <span id="totalKeseluruhan">0</span>
+</div>
+
 <!-- Filter global -->
 <div class="mb-4 flex flex-col md:flex-row gap-2">
   <input id="filterKecamatan" type="text" placeholder="Filter Kecamatan..." class="px-3 py-2 border rounded w-full md:w-1/2">
@@ -36,6 +41,8 @@ function renderKecamatan(data) {
   container.innerHTML = "";
 
   const kecamatanMap = {};
+  let totalKeseluruhan = 0;
+
   data.forEach(row => {
     const kec = row["Kecamatan"];
     const pengguna = row["Pengguna Barang"];
@@ -43,7 +50,11 @@ function renderKecamatan(data) {
     if (!kecamatanMap[kec]) kecamatanMap[kec] = { list: [], total: 0 };
     kecamatanMap[kec].list.push({ pengguna, nilai });
     kecamatanMap[kec].total += nilai;
+    totalKeseluruhan += nilai;
   });
+
+  // Update total keseluruhan
+  document.getElementById("totalKeseluruhan").textContent = totalKeseluruhan.toLocaleString();
 
   // Grafik global
   const chartLabels = Object.keys(kecamatanMap);
