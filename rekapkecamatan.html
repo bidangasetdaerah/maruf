@@ -31,7 +31,7 @@
 <div id="container" class="space-y-4"></div>
 
 <script>
-const sheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTzDGHCw-E29ViqHSyUB2TX9bHqoXDtOB8bgo_A4eyzRlj8uRF7lVT7wfPRYc-kah8MWXlm-u3Am5Tt/pub?gid=0&single=true&output=csv";
+const sheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTzDGHCw-E29ViqHSyUB2TX9bHqoXDtOB8bgo_A4eyzRlj8uRF7lVT7wfPRYc-kah8MWXlm-u3Am5Tt/pub?gid=209208682&single=true&output=csv";
 
 let rawData = [];
 let filteredData = [];
@@ -44,8 +44,8 @@ function renderKecamatan(data) {
   let totalKeseluruhan = 0;
 
   data.forEach(row => {
-    const kec = row["Kecamatan"];
-    const pengguna = row["Pengguna Barang"];
+    const kec = (row["Kecamatan"] || "").trim();
+    const pengguna = (row["Pengguna Barang"] || "").trim();
     const nilai = parseFloat(row["Nilai Perolehan"]) || 0;
     if (!kecamatanMap[kec]) kecamatanMap[kec] = { list: [], total: 0 };
     kecamatanMap[kec].list.push({ pengguna, nilai });
@@ -53,7 +53,6 @@ function renderKecamatan(data) {
     totalKeseluruhan += nilai;
   });
 
-  // Update total keseluruhan
   document.getElementById("totalKeseluruhan").textContent = totalKeseluruhan.toLocaleString();
 
   // Grafik global
@@ -109,7 +108,6 @@ function renderKecamatan(data) {
     canvas.height = 80;
     canvasWrapper.appendChild(canvas);
 
-    // Toggle expand/collapse
     header.addEventListener("click", () => {
       tableWrapper.classList.toggle("hidden");
       canvasWrapper.classList.toggle("hidden");
@@ -141,7 +139,9 @@ function renderKecamatan(data) {
 Papa.parse(sheetUrl, {
   download: true,
   header: true,
+  skipEmptyLines: true,
   complete: function(results) {
+    // normalisasi header
     rawData = results.data.map(row => {
       const normalized = {};
       for (const key in row) normalized[key.trim()] = row[key]?.trim() || '';
