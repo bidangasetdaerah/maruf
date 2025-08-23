@@ -25,12 +25,10 @@
       download: true,
       header: true,
       complete: function(results) {
+        // Normalisasi nama kolom
         const data = results.data.map(row => {
-          // Normalisasi nama kolom
           const normalized = {};
-          for (const key in row) {
-            normalized[key.trim()] = row[key];
-          }
+          for (const key in row) normalized[key.trim()] = row[key];
           return normalized;
         });
 
@@ -47,24 +45,13 @@
           kecamatanMap[kec].total += nilai;
         });
 
-        // Render grafik ringkasan
+        // Grafik global
         const chartLabels = Object.keys(kecamatanMap);
         const chartValues = chartLabels.map(k => kecamatanMap[k].total);
         new Chart(document.getElementById("summaryChart"), {
           type: 'bar',
-          data: {
-            labels: chartLabels,
-            datasets: [{
-              label: 'Total Nilai Perolehan',
-              data: chartValues,
-              backgroundColor: 'rgba(37, 99, 235, 0.7)'
-            }]
-          },
-          options: {
-            responsive: true,
-            plugins: { legend: { display: false } },
-            scales: { y: { beginAtZero: true } }
-          }
+          data: { labels: chartLabels, datasets: [{ label: 'Total Nilai Perolehan', data: chartValues, backgroundColor: 'rgba(37,99,235,0.7)' }] },
+          options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
         });
 
         // Render per kecamatan
@@ -76,9 +63,10 @@
           header.innerHTML = `${kec} - Total Nilai: <strong>${kecamatanMap[kec].total.toLocaleString()}</strong>`;
           header.className = "w-full text-left font-semibold text-lg bg-blue-600 text-white p-2 rounded";
 
-          const list = document.createElement("table");
-          list.className = "mt-2 ml-4 hidden w-full border";
-          list.innerHTML = `
+          // Tabel sekolah
+          const table = document.createElement("table");
+          table.className = "mt-2 ml-4 hidden w-full border";
+          table.innerHTML = `
             <thead>
               <tr class="bg-gray-200 text-left">
                 <th class="px-2 py-1 border">Pengguna Barang</th>
@@ -87,7 +75,7 @@
             </thead>
             <tbody></tbody>
           `;
-          const tbody = list.querySelector("tbody");
+          const tbody = table.querySelector("tbody");
           kecamatanMap[kec].list.forEach(item => {
             const tr = document.createElement("tr");
             tr.innerHTML = `
@@ -97,10 +85,37 @@
             tbody.appendChild(tr);
           });
 
-          header.addEventListener("click", () => list.classList.toggle("hidden"));
+          // Grafik per kecamatan
+          const canvasWrapper = document.createElement("div");
+          canvasWrapper.className = "mt-2 hidden";
+          const canvas = document.createElement("canvas");
+          canvas.height = 80;
+          canvasWrapper.appendChild(canvas);
+
+          header.addEventListener("click", () => {
+            const show = table.classList.toggle("hidden");
+            canvasWrapper.classList.toggle("hidden");
+
+            // Render chart hanya saat expand
+            if (!canvasWrapper.classList.contains("hidden")) {
+              new Chart(canvas, {
+                type: 'bar',
+                data: {
+                  labels: kecamatanMap[kec].list.map(x => x.pengguna),
+                  datasets: [{
+                    label: 'Nilai Perolehan',
+                    data: kecamatanMap[kec].list.map(x => x.nilai),
+                    backgroundColor: 'rgba(16,185,129,0.7)'
+                  }]
+                },
+                options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+              });
+            }
+          });
 
           wrapper.appendChild(header);
-          wrapper.appendChild(list);
+          wrapper.appendChild(table);
+          wrapper.appendChild(canvasWrapper);
           container.appendChild(wrapper);
         });
       }
