@@ -6,10 +6,15 @@
   <title>Data Sekolah per Kecamatan</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body class="bg-gray-100 p-6">
-  <h1 class="text-2xl font-bold mb-4">KIB B Peralatan Dan Mesin Dinas Pendidikan dan Kebudayaan</h1>
-  <h1 class="text-xl font-semibold mb-4">📊 Data Nilai Aset Sekolah per Kecamatan</h1>
+  <h1 class="text-2xl font-bold mb-2">KIB B Peralatan Dan Mesin Dinas Pendidikan dan Kebudayaan</h1>
+  <h2 class="text-xl font-semibold mb-4">📊 Data Nilai Aset Sekolah per Kecamatan</h2>
+
+  <div class="bg-white p-4 rounded shadow mb-4">
+    <canvas id="summaryChart" height="100"></canvas>
+  </div>
 
   <div id="container" class="space-y-2"></div>
 
@@ -20,7 +25,15 @@
       download: true,
       header: true,
       complete: function(results) {
-        const data = results.data;
+        const data = results.data.map(row => {
+          // Normalisasi nama kolom
+          const normalized = {};
+          for (const key in row) {
+            normalized[key.trim()] = row[key];
+          }
+          return normalized;
+        });
+
         const container = document.getElementById("container");
 
         // Group by kecamatan
@@ -34,17 +47,35 @@
           kecamatanMap[kec].total += nilai;
         });
 
+        // Render grafik ringkasan
+        const chartLabels = Object.keys(kecamatanMap);
+        const chartValues = chartLabels.map(k => kecamatanMap[k].total);
+        new Chart(document.getElementById("summaryChart"), {
+          type: 'bar',
+          data: {
+            labels: chartLabels,
+            datasets: [{
+              label: 'Total Nilai Perolehan',
+              data: chartValues,
+              backgroundColor: 'rgba(37, 99, 235, 0.7)'
+            }]
+          },
+          options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true } }
+          }
+        });
+
         // Render per kecamatan
         Object.keys(kecamatanMap).forEach(kec => {
           const wrapper = document.createElement("div");
           wrapper.className = "bg-white shadow rounded p-3";
 
-          // Tombol kecamatan dengan total
           const header = document.createElement("button");
           header.innerHTML = `${kec} - Total Nilai: <strong>${kecamatanMap[kec].total.toLocaleString()}</strong>`;
           header.className = "w-full text-left font-semibold text-lg bg-blue-600 text-white p-2 rounded";
-          
-          // List sekolah (expand/collapse)
+
           const list = document.createElement("table");
           list.className = "mt-2 ml-4 hidden w-full border";
           list.innerHTML = `
@@ -66,10 +97,7 @@
             tbody.appendChild(tr);
           });
 
-          // Toggle expand
-          header.addEventListener("click", () => {
-            list.classList.toggle("hidden");
-          });
+          header.addEventListener("click", () => list.classList.toggle("hidden"));
 
           wrapper.appendChild(header);
           wrapper.appendChild(list);
