@@ -27,10 +27,11 @@
         const kecamatanMap = {};
         data.forEach(row => {
           const kec = row["Kecamatan"];
-          const sekolah = row["Nama Sekolah"];
-          const nilai = row["Nilai Aset"];
-          if (!kecamatanMap[kec]) kecamatanMap[kec] = [];
-          kecamatanMap[kec].push({ sekolah, nilai });
+          const pengguna = row["Pengguna Barang"];
+          const nilai = parseFloat(row["Nilai Perolehan"]) || 0;
+          if (!kecamatanMap[kec]) kecamatanMap[kec] = { list: [], total: 0 };
+          kecamatanMap[kec].list.push({ pengguna, nilai });
+          kecamatanMap[kec].total += nilai;
         });
 
         // Render per kecamatan
@@ -38,9 +39,9 @@
           const wrapper = document.createElement("div");
           wrapper.className = "bg-white shadow rounded p-3";
 
-          // Tombol kecamatan
+          // Tombol kecamatan dengan total
           const header = document.createElement("button");
-          header.textContent = kec;
+          header.innerHTML = `${kec} - Total Nilai: <strong>${kecamatanMap[kec].total.toLocaleString()}</strong>`;
           header.className = "w-full text-left font-semibold text-lg bg-blue-600 text-white p-2 rounded";
           
           // List sekolah (expand/collapse)
@@ -49,18 +50,18 @@
           list.innerHTML = `
             <thead>
               <tr class="bg-gray-200 text-left">
-                <th class="px-2 py-1 border">Nama Sekolah</th>
-                <th class="px-2 py-1 border">Nilai Aset</th>
+                <th class="px-2 py-1 border">Pengguna Barang</th>
+                <th class="px-2 py-1 border text-right">Nilai Perolehan</th>
               </tr>
             </thead>
             <tbody></tbody>
           `;
           const tbody = list.querySelector("tbody");
-          kecamatanMap[kec].forEach(item => {
+          kecamatanMap[kec].list.forEach(item => {
             const tr = document.createElement("tr");
             tr.innerHTML = `
-              <td class="px-2 py-1 border">${item.sekolah}</td>
-              <td class="px-2 py-1 border text-right">${item.nilai}</td>
+              <td class="px-2 py-1 border">${item.pengguna}</td>
+              <td class="px-2 py-1 border text-right">${item.nilai.toLocaleString()}</td>
             `;
             tbody.appendChild(tr);
           });
