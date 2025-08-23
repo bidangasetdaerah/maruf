@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rekap Kecamatan – Data dari Google Sheets</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    thead th { position: sticky; top: 0; background: white; z-index: 10; }
+    thead tr.filters th { top: 40px; background: #fafafa; }
+    .scroll-area { max-height: 70vh; overflow: auto; }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-800 min-h-screen">
+  <div class="max-w-7xl mx-auto p-4 md:p-6">
+    <header class="flex items-center justify-between gap-4 mb-4">
+      <h1 class="text-2xl md:text-3xl font-bold">Rekap Kecamatan</h1>
+      <div class="flex items-center gap-2">
+        <button id="refreshBtn" class="px-3 py-2 rounded-xl bg-blue-600 text-white shadow hover:bg-blue-700">Muat Ulang</button>
+        <button id="downloadCsvBtn" class="px-3 py-2 rounded-xl bg-gray-800 text-white shadow hover:bg-black">Unduh CSV</button>
+        <button id="printBtn" class="px-3 py-2 rounded-xl bg-green-600 text-white shadow hover:bg-green-700">Cetak / PDF</button>
+      </div>
+    </header>
+
+    <section class="mb-3 grid md:grid-cols-2 gap-3 items-end">
+      <div>
+        <label class="block text-sm font-medium mb-1">Cari (semua kolom)</label>
+        <input id="globalSearch" class="w-full px-3 py-2 rounded-xl border" placeholder="Ketik untuk mencari..." />
+      </div>
+    </section>
+
+    <div id="status" class="text-sm text-gray-600 mb-2">Siap memuat data...</div>
+
+    <div class="border rounded-2xl bg-white shadow mb-6">
+      <div class="scroll-area">
+        <table id="dataTable" class="min-w-full table-auto">
+          <thead id="tableHead"></thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+      <div class="flex items-center justify-between p-3 border-t">
+        <div class="text-sm text-gray-600"><span id="countShown">0</span> / <span id="countTotal">0</span> baris ditampilkan</div>
+        <div class="flex gap-2 items-center">
+          <button id="prevPage" class="px-3 py-1 rounded-lg border">Prev</button>
+          <span id="pageInfo" class="text-sm"></span>
+          <button id="nextPage" class="px-3 py-1 rounded-lg border">Next</button>
+          <label class="text-sm ml-3">Baris/halaman
+            <select id="pageSize" class="ml-2 border rounded-lg px-2 py-1">
+              <option>10</option>
+              <option selected>25</option>
+              <option>50</option>
+              <option>100</option>
+            </select>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white p-4 rounded-2xl shadow">
+      <h2 class="text-lg font-semibold mb-2">Grafik Ringkasan</h2>
+      <canvas id="summaryChart" height="120"></canvas>
+    </div>
+  </div>
+
+  <script>
+    const els = {
+      status: document.getElementById('status'),
+      tableHead: document.getElementById('tableHead'),
+      tableBody: document.getElementById('tableBody'),
+      globalSearch: document.getElementById('globalSearch'),
+      refreshBtn: document.getElementById('refreshBtn'),
+      downloadCsvBtn: document.getElementById('downloadCsvBtn'),
+      printBtn: document.getElementById('printBtn'),
+      prevPage: document.getElementById('prevPage'),
+      nextPage: document.getElementById('nextPage'),
+      pageInfo: document.getElementById('pageInfo'),
+      pageSize: document.getElementById('pageSize'),
+      countShown: document.getElementById('countShown'),
+      countTotal: document.getElementById('countTotal'),
+      chart: document.getElementById('summaryChart'),
+    };
+
+    let rawData = [];
+    let headers = [];
+    let filters = {};
+    let sortState = { key: null, dir: 'asc' };
+    let currentPage = 1;
+    let chartInstance;
+
+    function buildCsvUrl() {
+      const id = "1BUphKQVnCyECmkhUu7J1_GrOLIw3FawsDyK3RkZlnVI";
+      const sheet = "Rekap Kecamatan";
+      const base = `https://docs.google.com/spreadsheets/d/${id}/gviz/tq`;
+      const params = new URLSearchParams({ 'tqx': 'out:csv', 'sheet': sheet });
+      return `${base}?${params.toString()}`;
+    }
+
+    async function fetchCsv() {
+      const url = buildCsvUrl();
+      els.status.textContent = 'Memuat data dari Google Sheets...';
+      try {
+        const resp = await fetch(url, { cache: 'no-store' });
+        if (!resp.ok) throw new Error('Gagal mengambil CSV. Pastikan sheet publik.');
+        const csvText = await resp.text();
+        return csvText;
+      } catch (e) {
+        els.status.innerHTML = `<span class="text-red-600">${e.message}</span>`;
+        throw e;
+      }
+    }
+
+    function parseCsv(csvText) {
+      const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true });
+      headers = parsed.meta.fields || [];
+      rawData = parsed.data.map(r => ({ ...r }));
+    }
+
+    function createTableHead() {
+      els.tableHead.innerHTML = '';
+      const tr = document.createElement('tr');
+      headers.forEach(h => {
+        const th = document.createElement('th');
+        th.className = 'px-3 py-2 text-left text-sm font-semibold border-b cursor-pointer';
+        th.textContent = h;
+        th.addEventListener('click', () => handleSort(h));
+        tr.appendChild(th);
+      });
+      els.tableHead.appendChild(tr);
+      const trFilters = document.createElement('tr');
+      trFilters.className = 'filters';
+      headers.forEach(h => {
+        const th = document.createElement('th');
+        th.className = 'px-2 py-2 border-b';
+        const input = document.createElement('input');
+        input.className = 'w-full px-2 py-1 text-sm border rounded-lg';
+        input.placeholder = `Filter ${h}`;
+        input.value = filters[h] || '';
+        input.addEventListener('input', () => {
+          filters[h] = input.value;
+          currentPage = 1;
+          renderBody();
+        });
+        th.appendChild(input);
+        trFilters.appendChild(th);
+      });
+      els.tableHead.appendChild(trFilters);
+    }
+
+    function applyFiltersAndSearch(data) {
+      const q = els.globalSearch.value.toLowerCase();
+      return data.filter(row => {
+        const matchesGlobal = !q || headers.some(h => String(row[h] ?? '').toLowerCase().includes(q));
+        if (!matchesGlobal) return false;
+        for (const [key, val] of Object.entries(filters)) {
+          if (val && !String(row[key] ?? '').toLowerCase().includes(val.toLowerCase())) return false;
+        }
+        return true;
+      });
+    }
+
+    function applySort(data) {
+      if (!sortState.key) return data;
+      const { key, dir } = sortState;
+      const sorted = [...data].sort((a, b) => {
+        const av = a[key] ?? '';
+        const bv = b[key] ?? '';
+        const numa = parseFloat(av); const numb = parseFloat(bv);
+        const bothNum = !isNaN(numa) && !isNaN(numb);
+        if (bothNum) return dir === 'asc' ? (numa - numb) : (numb - numa);
+        return dir === 'asc' ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
+      });
+      return sorted;
+    }
+
+    function paginate(data) {
+      const size = parseInt(els.pageSize.value, 10) || 25;
+      const totalPages = Math.max(1, Math.ceil(data.length / size));
+      if (currentPage > totalPages) currentPage = totalPages;
+      const start = (currentPage - 1) * size;
+      const page = data.slice(start, start + size);
+      els.pageInfo.textContent = `Halaman ${currentPage} dari ${totalPages}`;
+      els.prevPage.disabled = currentPage <= 1;
+      els.nextPage.disabled = currentPage >= totalPages;
+      return page;
+    }
+
+    function renderBody() {
+      let rows = applyFiltersAndSearch(rawData);
+      els.countTotal.textContent = rawData.length;
+      rows = applySort(rows);
+      els.countShown.textContent = rows.length;
+      const pageRows = paginate(rows);
+
+      const frag = document.createDocumentFragment();
+      pageRows.forEach(row => {
+        const tr = document.createElement('tr');
+        headers.forEach(h => {
+          const td = document.createElement('td');
+          td.className = 'px-3 py-2 border-b text-sm';
+          td.textContent = row[h] ?? '';
+          tr.appendChild(td);
+        });
+        frag.appendChild(tr);
+      });
+      els.tableBody.innerHTML = '';
+      els.tableBody.appendChild(frag);
+
+      renderChart(rows);
+      els.status.textContent = 'Selesai memuat.';
+    }
+
+    function handleSort(key) {
+      if (sortState.key === key) {
+        sortState.dir = sortState.dir === 'asc' ? 'desc' : 'asc';
+      } else {
+        sortState.key = key;
+        sortState.dir = 'asc';
+      }
+      renderBody();
+    }
+
+    function renderChart(rows) {
+      if (!rows.length) return;
+      const labelKey = headers[0];
+      const valueKey = headers.find(h => h.toLowerCase().includes('jumlah') || h.toLowerCase().includes('total'));
+      if (!valueKey) return;
+
+      const labels = rows.map(r => r[labelKey]);
+      const values = rows.map(r => parseFloat(r[valueKey]) || 0);
+
+      if (chartInstance) chartInstance.destroy();
+      chartInstance = new Chart(els.chart, {
+        type: 'bar',
+        data: { labels, datasets: [{ label: valueKey, data: values }] },
+        options: { responsive: true, plugins: { legend: { display: false } } }
+      });
+    }
+
+    async function load() {
+      try {
+        const csvText = await fetchCsv();
+        parseCsv(csvText);
+        filters = {};
+        sortState = { key: null, dir: 'asc' };
+        currentPage = 1;
+        createTableHead();
+        renderBody();
+      } catch (_) {}
+    }
+
+    els.globalSearch.addEventListener('input', () => { currentPage = 1; renderBody(); });
+    els.refreshBtn.addEventListener('click', load);
+    els.downloadCsvBtn.addEventListener('click', () => { window.open(buildCsvUrl(), '_blank'); });
+    els.printBtn.addEventListener('click', () => window.print());
+    els.prevPage.addEventListener('click', () => { if (currentPage > 1) { currentPage--; renderBody(); } });
+    els.nextPage.addEventListener('click', () => { currentPage++; renderBody(); });
+    els.pageSize.addEventListener('change', () => { currentPage = 1; renderBody(); });
+
+    load();
+  </script>
+</body>
+</html>
