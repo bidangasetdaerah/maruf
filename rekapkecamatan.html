@@ -3,128 +3,157 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Data Sekolah per Kecamatan - Responsive</title>
+<title>Data Sekolah per Kecamatan - Filter & Grafik</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body class="bg-gray-100 p-4 md:p-6">
-  <h1 class="text-2xl md:text-3xl font-bold mb-2">KIB B Peralatan Dan Mesin Dinas Pendidikan dan Kebudayaan</h1>
-  <h2 class="text-xl font-semibold mb-4">📊 Data Nilai Aset Sekolah per Kecamatan</h2>
 
-  <div class="bg-white p-4 rounded shadow mb-6 overflow-x-auto">
-    <canvas id="summaryChart" height="100"></canvas>
-  </div>
+<h1 class="text-2xl md:text-3xl font-bold mb-2">KIB B Peralatan Dan Mesin Dinas Pendidikan dan Kebudayaan</h1>
+<h2 class="text-xl font-semibold mb-4">📊 Data Nilai Aset Sekolah per Kecamatan</h2>
 
-  <div id="container" class="space-y-4"></div>
+<!-- Filter global -->
+<div class="mb-4 flex flex-col md:flex-row gap-2">
+  <input id="filterKecamatan" type="text" placeholder="Filter Kecamatan..." class="px-3 py-2 border rounded w-full md:w-1/2">
+  <input id="filterPengguna" type="text" placeholder="Filter Pengguna Barang..." class="px-3 py-2 border rounded w-full md:w-1/2">
+</div>
+
+<div class="bg-white p-4 rounded shadow mb-6 overflow-x-auto">
+  <canvas id="summaryChart" height="100"></canvas>
+</div>
+
+<div id="container" class="space-y-4"></div>
 
 <script>
 const sheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTzDGHCw-E29ViqHSyUB2TX9bHqoXDtOB8bgo_A4eyzRlj8uRF7lVT7wfPRYc-kah8MWXlm-u3Am5Tt/pub?gid=0&single=true&output=csv";
 
+let rawData = [];
+let filteredData = [];
+
+function renderKecamatan(data) {
+  const container = document.getElementById("container");
+  container.innerHTML = "";
+
+  const kecamatanMap = {};
+  data.forEach(row => {
+    const kec = row["Kecamatan"];
+    const pengguna = row["Pengguna Barang"];
+    const nilai = parseFloat(row["Nilai Perolehan"]) || 0;
+    if (!kecamatanMap[kec]) kecamatanMap[kec] = { list: [], total: 0 };
+    kecamatanMap[kec].list.push({ pengguna, nilai });
+    kecamatanMap[kec].total += nilai;
+  });
+
+  // Grafik global
+  const chartLabels = Object.keys(kecamatanMap);
+  const chartValues = chartLabels.map(k => kecamatanMap[k].total);
+  new Chart(document.getElementById("summaryChart"), {
+    type: 'bar',
+    data: {
+      labels: chartLabels,
+      datasets: [{ label: 'Total Nilai Perolehan', data: chartValues, backgroundColor: 'rgba(37,99,235,0.7)' }]
+    },
+    options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+  });
+
+  // Render per kecamatan
+  Object.keys(kecamatanMap).forEach(kec => {
+    const wrapper = document.createElement("div");
+    wrapper.className = "bg-white shadow rounded p-3";
+
+    const header = document.createElement("button");
+    header.innerHTML = `${kec} - Total Nilai: <strong>${kecamatanMap[kec].total.toLocaleString()}</strong>`;
+    header.className = "w-full text-left font-semibold text-lg bg-blue-600 text-white p-2 rounded";
+
+    // Tabel sekolah
+    const tableWrapper = document.createElement("div");
+    tableWrapper.className = "mt-2 ml-0 hidden overflow-x-auto";
+    const table = document.createElement("table");
+    table.className = "w-full min-w-[400px] border-collapse";
+    table.innerHTML = `
+      <thead>
+        <tr class="bg-gray-200">
+          <th class="px-2 py-1 border">Pengguna Barang</th>
+          <th class="px-2 py-1 border text-right">Nilai Perolehan</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    `;
+    const tbody = table.querySelector("tbody");
+    kecamatanMap[kec].list.forEach(item => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td class="px-2 py-1 border">${item.pengguna}</td>
+        <td class="px-2 py-1 border text-right">${item.nilai.toLocaleString()}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+    tableWrapper.appendChild(table);
+
+    // Grafik per kecamatan
+    const canvasWrapper = document.createElement("div");
+    canvasWrapper.className = "mt-2 hidden";
+    const canvas = document.createElement("canvas");
+    canvas.height = 80;
+    canvasWrapper.appendChild(canvas);
+
+    // Toggle expand/collapse
+    header.addEventListener("click", () => {
+      tableWrapper.classList.toggle("hidden");
+      canvasWrapper.classList.toggle("hidden");
+
+      if (!canvasWrapper.classList.contains("hidden")) {
+        new Chart(canvas, {
+          type: 'bar',
+          data: {
+            labels: kecamatanMap[kec].list.map(x => x.pengguna),
+            datasets: [{
+              label: 'Nilai Perolehan',
+              data: kecamatanMap[kec].list.map(x => x.nilai),
+              backgroundColor: 'rgba(16,185,129,0.7)'
+            }]
+          },
+          options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+        });
+      }
+    });
+
+    wrapper.appendChild(header);
+    wrapper.appendChild(tableWrapper);
+    wrapper.appendChild(canvasWrapper);
+    container.appendChild(wrapper);
+  });
+}
+
+// Ambil data CSV
 Papa.parse(sheetUrl, {
   download: true,
   header: true,
   complete: function(results) {
-    const data = results.data.map(row => {
+    rawData = results.data.map(row => {
       const normalized = {};
       for (const key in row) normalized[key.trim()] = row[key]?.trim() || '';
       return normalized;
     });
-
-    const container = document.getElementById("container");
-
-    // Group by kecamatan
-    const kecamatanMap = {};
-    data.forEach(row => {
-      const kec = row["Kecamatan"];
-      const pengguna = row["Pengguna Barang"];
-      const nilai = parseFloat(row["Nilai Perolehan"]) || 0;
-      if (!kecamatanMap[kec]) kecamatanMap[kec] = { list: [], total: 0 };
-      kecamatanMap[kec].list.push({ pengguna, nilai });
-      kecamatanMap[kec].total += nilai;
-    });
-
-    // Grafik global
-    const chartLabels = Object.keys(kecamatanMap);
-    const chartValues = chartLabels.map(k => kecamatanMap[k].total);
-    new Chart(document.getElementById("summaryChart"), {
-      type: 'bar',
-      data: {
-        labels: chartLabels,
-        datasets: [{ label: 'Total Nilai Perolehan', data: chartValues, backgroundColor: 'rgba(37,99,235,0.7)' }]
-      },
-      options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
-    });
-
-    // Render per kecamatan
-    Object.keys(kecamatanMap).forEach(kec => {
-      const wrapper = document.createElement("div");
-      wrapper.className = "bg-white shadow rounded p-3";
-
-      const header = document.createElement("button");
-      header.innerHTML = `${kec} - Total Nilai: <strong>${kecamatanMap[kec].total.toLocaleString()}</strong>`;
-      header.className = "w-full text-left font-semibold text-lg bg-blue-600 text-white p-2 rounded";
-
-      // Tabel sekolah responsive
-      const tableWrapper = document.createElement("div");
-      tableWrapper.className = "mt-2 ml-0 hidden overflow-x-auto";
-      const table = document.createElement("table");
-      table.className = "w-full min-w-[400px] border-collapse";
-      table.innerHTML = `
-        <thead>
-          <tr class="bg-gray-200">
-            <th class="px-2 py-1 border">Pengguna Barang</th>
-            <th class="px-2 py-1 border text-right">Nilai Perolehan</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      `;
-      const tbody = table.querySelector("tbody");
-      kecamatanMap[kec].list.forEach(item => {
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
-          <td class="px-2 py-1 border">${item.pengguna}</td>
-          <td class="px-2 py-1 border text-right">${item.nilai.toLocaleString()}</td>
-        `;
-        tbody.appendChild(tr);
-      });
-      tableWrapper.appendChild(table);
-
-      // Grafik per kecamatan
-      const canvasWrapper = document.createElement("div");
-      canvasWrapper.className = "mt-2 hidden";
-      const canvas = document.createElement("canvas");
-      canvas.height = 80;
-      canvasWrapper.appendChild(canvas);
-
-      // Toggle expand/collapse
-      header.addEventListener("click", () => {
-        tableWrapper.classList.toggle("hidden");
-        canvasWrapper.classList.toggle("hidden");
-
-        if (!canvasWrapper.classList.contains("hidden")) {
-          new Chart(canvas, {
-            type: 'bar',
-            data: {
-              labels: kecamatanMap[kec].list.map(x => x.pengguna),
-              datasets: [{
-                label: 'Nilai Perolehan',
-                data: kecamatanMap[kec].list.map(x => x.nilai),
-                backgroundColor: 'rgba(16,185,129,0.7)'
-              }]
-            },
-            options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
-          });
-        }
-      });
-
-      wrapper.appendChild(header);
-      wrapper.appendChild(tableWrapper);
-      wrapper.appendChild(canvasWrapper);
-      container.appendChild(wrapper);
-    });
+    filteredData = [...rawData];
+    renderKecamatan(filteredData);
   }
 });
+
+// Filter input
+document.getElementById("filterKecamatan").addEventListener("input", () => {
+  const val = document.getElementById("filterKecamatan").value.toLowerCase();
+  filteredData = rawData.filter(r => (r["Kecamatan"] || "").toLowerCase().includes(val));
+  renderKecamatan(filteredData);
+});
+
+document.getElementById("filterPengguna").addEventListener("input", () => {
+  const val = document.getElementById("filterPengguna").value.toLowerCase();
+  filteredData = rawData.filter(r => (r["Pengguna Barang"] || "").toLowerCase().includes(val));
+  renderKecamatan(filteredData);
+});
 </script>
+
 </body>
 </html>
