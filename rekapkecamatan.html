@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Data Sekolah per Kecamatan</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+</head>
+<body class="bg-gray-100 p-6">
+ <h1 class="text-2xl font-bold mb-4">KIB B Peralatan Dan Mesin Dinas Pendidikan dan Kebudayaan</h1>
+  <h1 class="text-2xl font-bold mb-4">📊 Data Nilai Aset Sekolah per Kecamatan</h1>
+
+  <div id="container" class="space-y-2"></div>
+
+  <script>
+    const sheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTzDGHCw-E29ViqHSyUB2TX9bHqoXDtOB8bgo_A4eyzRlj8uRF7lVT7wfPRYc-kah8MWXlm-u3Am5Tt/pub?gid=0&single=true&output=csv";
+
+    // Ambil data CSV
+    Papa.parse(sheetUrl, {
+      download: true,
+      header: true,
+      complete: function(results) {
+        const data = results.data;
+        const container = document.getElementById("container");
+
+        // Group by kecamatan
+        const kecamatanMap = {};
+        data.forEach(row => {
+          const kec = row["Kecamatan"];
+          const sekolah = row["Nama Sekolah"];
+          if (!kecamatanMap[kec]) kecamatanMap[kec] = [];
+          kecamatanMap[kec].push(sekolah);
+        });
+
+        // Render per kecamatan
+        Object.keys(kecamatanMap).forEach(kec => {
+          const wrapper = document.createElement("div");
+          wrapper.className = "bg-white shadow rounded p-3";
+
+          // Tombol kecamatan
+          const header = document.createElement("button");
+          header.textContent = kec;
+          header.className = "w-full text-left font-semibold text-lg bg-blue-600 text-white p-2 rounded";
+          
+          // List sekolah (expand/collapse)
+          const list = document.createElement("ul");
+          list.className = "mt-2 ml-4 hidden list-disc";
+          kecamatanMap[kec].forEach(s => {
+            const li = document.createElement("li");
+            li.textContent = s;
+            list.appendChild(li);
+          });
+
+          // Toggle expand
+          header.addEventListener("click", () => {
+            list.classList.toggle("hidden");
+          });
+
+          wrapper.appendChild(header);
+          wrapper.appendChild(list);
+          container.appendChild(wrapper);
+        });
+      }
+    });
+  </script>
+</body>
+</html>
