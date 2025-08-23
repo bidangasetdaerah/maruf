@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Data Sekolah per Kecamatan - Grafik Otomatis</title>
+<title>Data Sekolah per Kecamatan - Collapse/Expand</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -13,12 +13,10 @@
 <h1 class="text-2xl md:text-3xl font-bold mb-2">KIB B Peralatan Dan Mesin Dinas Pendidikan dan Kebudayaan</h1>
 <h2 class="text-xl font-semibold mb-4">📊 Data Nilai Aset Sekolah per Kecamatan</h2>
 
-<!-- Total keseluruhan -->
 <div class="bg-green-100 text-green-800 p-3 rounded mb-4">
   <strong>Total Keseluruhan Nilai Perolehan: </strong> <span id="totalKeseluruhan">0</span>
 </div>
 
-<!-- Filter global -->
 <div class="mb-4 flex flex-col md:flex-row gap-2">
   <input id="filterKecamatan" type="text" placeholder="Filter Kecamatan..." class="px-3 py-2 border rounded w-full md:w-1/2">
   <input id="filterPengguna" type="text" placeholder="Filter Pengguna Barang..." class="px-3 py-2 border rounded w-full md:w-1/2">
@@ -32,9 +30,17 @@
 
 <script>
 const sheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTzDGHCw-E29ViqHSyUB2TX9bHqoXDtOB8bgo_A4eyzRlj8uRF7lVT7wfPRYc-kah8MWXlm-u3Am5Tt/pub?gid=209208682&single=true&output=csv";
-
 let rawData = [];
 let filteredData = [];
+
+// Fungsi generate warna random
+function randomColors(count) {
+  const colors = [];
+  for (let i = 0; i < count; i++) {
+    colors.push(`hsl(${Math.floor(Math.random() * 360)}, 65%, 55%)`);
+  }
+  return colors;
+}
 
 function renderKecamatan(data) {
   const container = document.getElementById("container");
@@ -67,18 +73,21 @@ function renderKecamatan(data) {
     options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
   });
 
-  // Render per kecamatan dengan grafik otomatis
+  // Render per kecamatan
   Object.keys(kecamatanMap).forEach(kec => {
     const wrapper = document.createElement("div");
     wrapper.className = "bg-white shadow rounded p-3";
 
-    const header = document.createElement("h3");
+    const header = document.createElement("button");
     header.innerHTML = `${kec} - Total Nilai: <strong>${kecamatanMap[kec].total.toLocaleString()}</strong>`;
-    header.className = "font-semibold text-lg mb-2";
+    header.className = "w-full text-left font-semibold text-lg bg-blue-600 text-white p-2 rounded";
 
-    // Tabel sekolah
+    const contentWrapper = document.createElement("div");
+    contentWrapper.className = "mt-2 hidden";
+
+    // Tabel
     const tableWrapper = document.createElement("div");
-    tableWrapper.className = "overflow-x-auto";
+    tableWrapper.className = "overflow-x-auto mb-2";
     const table = document.createElement("table");
     table.className = "w-full min-w-[400px] border-collapse";
     table.innerHTML = `
@@ -100,30 +109,35 @@ function renderKecamatan(data) {
       tbody.appendChild(tr);
     });
     tableWrapper.appendChild(table);
+    contentWrapper.appendChild(tableWrapper);
 
     // Grafik per kecamatan
     const canvasWrapper = document.createElement("div");
-    canvasWrapper.className = "mt-2";
     const canvas = document.createElement("canvas");
     canvas.height = 80;
     canvasWrapper.appendChild(canvas);
+    contentWrapper.appendChild(canvasWrapper);
 
-    new Chart(canvas, {
-      type: 'bar',
-      data: {
-        labels: kecamatanMap[kec].list.map(x => x.pengguna),
-        datasets: [{
-          label: 'Nilai Perolehan',
-          data: kecamatanMap[kec].list.map(x => x.nilai),
-          backgroundColor: 'rgba(16,185,129,0.7)'
-        }]
-      },
-      options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+    header.addEventListener("click", () => {
+      contentWrapper.classList.toggle("hidden");
+      if (!contentWrapper.classList.contains("hidden")) {
+        new Chart(canvas, {
+          type: 'bar',
+          data: {
+            labels: kecamatanMap[kec].list.map(x => x.pengguna),
+            datasets: [{
+              label: 'Nilai Perolehan',
+              data: kecamatanMap[kec].list.map(x => x.nilai),
+              backgroundColor: randomColors(kecamatanMap[kec].list.length)
+            }]
+          },
+          options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+        });
+      }
     });
 
     wrapper.appendChild(header);
-    wrapper.appendChild(tableWrapper);
-    wrapper.appendChild(canvasWrapper);
+    wrapper.appendChild(contentWrapper);
     container.appendChild(wrapper);
   });
 }
@@ -134,7 +148,6 @@ Papa.parse(sheetUrl, {
   header: true,
   skipEmptyLines: true,
   complete: function(results) {
-    // normalisasi header
     rawData = results.data.map(row => {
       const normalized = {};
       for (const key in row) normalized[key.trim()] = row[key]?.trim() || '';
@@ -158,6 +171,5 @@ document.getElementById("filterPengguna").addEventListener("input", () => {
   renderKecamatan(filteredData);
 });
 </script>
-
 </body>
 </html>
