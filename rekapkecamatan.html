@@ -25,10 +25,13 @@
       download: true,
       header: true,
       complete: function(results) {
-        // Normalisasi nama kolom
+        // Normalisasi kolom dan data
         const data = results.data.map(row => {
           const normalized = {};
-          for (const key in row) normalized[key.trim()] = row[key];
+          for (const key in row) {
+            const newKey = key.trim();
+            normalized[newKey] = row[key].trim ? row[key].trim() : row[key];
+          }
           return normalized;
         });
 
@@ -93,7 +96,7 @@
           canvasWrapper.appendChild(canvas);
 
           header.addEventListener("click", () => {
-            const show = table.classList.toggle("hidden");
+            table.classList.toggle("hidden");
             canvasWrapper.classList.toggle("hidden");
 
             // Render chart hanya saat expand
