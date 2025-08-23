@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Data Sekolah per Kecamatan - Filter & Grafik</title>
+<title>Data Sekolah per Kecamatan - Grafik Otomatis</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -67,18 +67,18 @@ function renderKecamatan(data) {
     options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
   });
 
-  // Render per kecamatan
+  // Render per kecamatan dengan grafik otomatis
   Object.keys(kecamatanMap).forEach(kec => {
     const wrapper = document.createElement("div");
     wrapper.className = "bg-white shadow rounded p-3";
 
-    const header = document.createElement("button");
+    const header = document.createElement("h3");
     header.innerHTML = `${kec} - Total Nilai: <strong>${kecamatanMap[kec].total.toLocaleString()}</strong>`;
-    header.className = "w-full text-left font-semibold text-lg bg-blue-600 text-white p-2 rounded";
+    header.className = "font-semibold text-lg mb-2";
 
     // Tabel sekolah
     const tableWrapper = document.createElement("div");
-    tableWrapper.className = "mt-2 ml-0 hidden overflow-x-auto";
+    tableWrapper.className = "overflow-x-auto";
     const table = document.createElement("table");
     table.className = "w-full min-w-[400px] border-collapse";
     table.innerHTML = `
@@ -103,29 +103,22 @@ function renderKecamatan(data) {
 
     // Grafik per kecamatan
     const canvasWrapper = document.createElement("div");
-    canvasWrapper.className = "mt-2 hidden";
+    canvasWrapper.className = "mt-2";
     const canvas = document.createElement("canvas");
     canvas.height = 80;
     canvasWrapper.appendChild(canvas);
 
-    header.addEventListener("click", () => {
-      tableWrapper.classList.toggle("hidden");
-      canvasWrapper.classList.toggle("hidden");
-
-      if (!canvasWrapper.classList.contains("hidden")) {
-        new Chart(canvas, {
-          type: 'bar',
-          data: {
-            labels: kecamatanMap[kec].list.map(x => x.pengguna),
-            datasets: [{
-              label: 'Nilai Perolehan',
-              data: kecamatanMap[kec].list.map(x => x.nilai),
-              backgroundColor: 'rgba(16,185,129,0.7)'
-            }]
-          },
-          options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
-        });
-      }
+    new Chart(canvas, {
+      type: 'bar',
+      data: {
+        labels: kecamatanMap[kec].list.map(x => x.pengguna),
+        datasets: [{
+          label: 'Nilai Perolehan',
+          data: kecamatanMap[kec].list.map(x => x.nilai),
+          backgroundColor: 'rgba(16,185,129,0.7)'
+        }]
+      },
+      options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
     });
 
     wrapper.appendChild(header);
