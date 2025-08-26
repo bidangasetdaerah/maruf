@@ -18,22 +18,6 @@
     <select id="kecamatanSelect" onchange="showDetail(this.value)" 
       class="p-2 border rounded w-full md:w-1/2">
       <option value="">-- Pilih Kecamatan --</option>
-      <option>Banawa</option>
-      <option>Banawa Tengah</option>
-      <option>Banawa Selatan</option>
-      <option>Rio Pakava</option>
-      <option>Pinembani</option>
-      <option>Tanantovea</option>
-      <option>Labuan</option>
-      <option>Sindue</option>
-      <option>Sindue Tombusabora</option>
-      <option>Sindue Tobata</option>
-      <option>Sirenja</option>
-      <option>Balaesang</option>
-      <option>Balaesang Tanjung</option>
-      <option>Dampelas</option>
-      <option>Sojol</option>
-      <option>Sojol Utara</option>
     </select>
   </div>
 
@@ -52,6 +36,12 @@
   <div class="bg-white p-4 rounded shadow mb-6">
     <h3 class="text-lg font-bold mb-2">Rekap Keseluruhan Kabupaten</h3>
     <canvas id="kabupatenChart" class="w-full max-h-80"></canvas>
+  </div>
+
+  <!-- Rekap antar Kecamatan -->
+  <div class="bg-white p-4 rounded shadow mb-6">
+    <h3 class="text-lg font-bold mb-2">Perbandingan Antar Kecamatan</h3>
+    <canvas id="kecamatanChart" class="w-full max-h-96"></canvas>
   </div>
 
   <div id="detail" class="bg-white p-4 rounded shadow"></div>
@@ -77,37 +67,57 @@ const dataKecamatan = {
 };
 
 let kabupatenSummary = { baik:0, ringan:0, berat:0 };
+let perKecamatanSummary = {};
 let kabupatenChart = null;
-let schoolChartInstance=null;
-let schoolChartData={labels:[],baik:[],ringan:[],berat:[]};
+let kecamatanChart = null;
 
-// Saat load pertama, muat rekap kabupaten
+// isi dropdown otomatis
 window.onload = async function(){
+  const select=document.getElementById("kecamatanSelect");
+  Object.keys(dataKecamatan).forEach(kec=>{
+    const opt=document.createElement("option");
+    opt.value=kec; opt.textContent=kec;
+    select.appendChild(opt);
+  });
+
   for(const kec in dataKecamatan){
-    await fetchDataKecamatan(kec, false); // false artinya hanya rekap, tidak render tabel
+    await fetchDataKecamatan(kec,false);
   }
   renderKabupatenChart();
+  renderKecamatanChart();
 };
 
+// ambil data & bersihkan kolom kondisi
 async function fetchDataKecamatan(kec, render=true){
   try {
     const response=await fetch(dataKecamatan[kec]);
     const csvText=await response.text();
     const parsed=Papa.parse(csvText,{header:true,skipEmptyLines:true});
-    const list=parsed.data.map(r=>( {
-      sekolah:r["Pengguna Barang"],
-      barang:r["Nama Barang"],
-      nibar:r["NIBAR"],
-      kondisiSebelumnya:r["Kondisi Sebelumnya"],
-      kondisiSaatIni:r["Kondisi Saat Ini"],
-      nilai:parseInt(r["Nilai Perolehan (Rp)"])||0
-    }));
+    const list=parsed.data.map(r=>{
+      const kondisiSaatIni = r["Kondisi Saat Ini"] || r["Kondisi"] || r["Kondisi Aset"] || r["Kondisi Sekarang"] || r["Kondisi Sebelumnya"];
+      return {
+        sekolah: r["Pengguna Barang"] || r["Sekolah"] || "Tidak Diketahui",
+        barang: r["Nama Barang"] || "-",
+        nibar: r["NIBAR"] || "-",
+        kondisiSebelumnya: r["Kondisi Sebelumnya"] || "-",
+        kondisiSaatIni: kondisiSaatIni || "-",
+        nilai: parseInt(r["Nilai Perolehan (Rp)"]) || 0
+      };
+    });
 
     // Hitung ringkasan kabupaten
     list.forEach(r=>{
       if(r.kondisiSaatIni==="Baik") kabupatenSummary.baik++;
       else if(r.kondisiSaatIni==="Rusak Ringan") kabupatenSummary.ringan++;
       else if(r.kondisiSaatIni==="Rusak Berat") kabupatenSummary.berat++;
+    });
+
+    // Ringkasan per kecamatan
+    if(!perKecamatanSummary[kec]) perKecamatanSummary[kec]={baik:0,ringan:0,berat:0};
+    list.forEach(r=>{
+      if(r.kondisiSaatIni==="Baik") perKecamatanSummary[kec].baik++;
+      else if(r.kondisiSaatIni==="Rusak Ringan") perKecamatanSummary[kec].ringan++;
+      else if(r.kondisiSaatIni==="Rusak Berat") perKecamatanSummary[kec].berat++;
     });
 
     if(render) renderDetail(kec,list);
@@ -119,9 +129,26 @@ function renderKabupatenChart(){
   if(kabupatenChart) kabupatenChart.destroy();
   kabupatenChart=new Chart(ctx,{
     type:"pie",
-    data:{ labels:["Baik","Rusak Ringan","Rusak Berat"],
+    data:{labels:["Baik","Rusak Ringan","Rusak Berat"],
       datasets:[{ data:[kabupatenSummary.baik,kabupatenSummary.ringan,kabupatenSummary.berat],
       backgroundColor:["#4CAF50","#FFC107","#F44336"] }]}
+  });
+}
+
+function renderKecamatanChart(){
+  const ctx=document.getElementById("kecamatanChart");
+  if(kecamatanChart) kecamatanChart.destroy();
+  kecamatanChart=new Chart(ctx,{
+    type:"bar",
+    data:{
+      labels:Object.keys(perKecamatanSummary),
+      datasets:[
+        {label:"Baik", data:Object.values(perKecamatanSummary).map(v=>v.baik), backgroundColor:"#4CAF50"},
+        {label:"Rusak Ringan", data:Object.values(perKecamatanSummary).map(v=>v.ringan), backgroundColor:"#FFC107"},
+        {label:"Rusak Berat", data:Object.values(perKecamatanSummary).map(v=>v.berat), backgroundColor:"#F44336"}
+      ]
+    },
+    options:{responsive:true,plugins:{legend:{position:"bottom"}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}}}
   });
 }
 
@@ -143,22 +170,18 @@ function renderDetail(kec,list){
   const detailDiv=document.getElementById("detail");
   document.getElementById("buttons").classList.remove("hidden");
 
-  // group per sekolah
   const sekolahMap={};
   list.forEach(r=>{
     if(!sekolahMap[r.sekolah]) sekolahMap[r.sekolah]=[];
     sekolahMap[r.sekolah].push(r);
   });
 
-  // hitung total kondisi kecamatan
   let baik=0, ringan=0, berat=0;
-  for(const s in sekolahMap){
-    sekolahMap[s].forEach(r=>{
-      if(r.kondisiSaatIni==="Baik") baik++;
-      else if(r.kondisiSaatIni==="Rusak Ringan") ringan++;
-      else if(r.kondisiSaatIni==="Rusak Berat") berat++;
-    });
-  }
+  list.forEach(r=>{
+    if(r.kondisiSaatIni==="Baik") baik++;
+    else if(r.kondisiSaatIni==="Rusak Ringan") ringan++;
+    else if(r.kondisiSaatIni==="Rusak Berat") berat++;
+  });
 
   let html=`<h3 class="text-xl font-bold mb-2">Kecamatan ${kec}</h3>
             <canvas id="pieChart" class="w-full max-h-80 mb-4"></canvas>
@@ -167,7 +190,6 @@ function renderDetail(kec,list){
                 <tr><th class="p-2">Sekolah</th><th>Baik</th><th>Rusak Ringan</th><th>Rusak Berat</th><th>Detail</th></tr>
               </thead><tbody>`;
 
-  const sekolahLabels=[], baikArr=[], ringanArr=[], beratArr=[];
   for(const s in sekolahMap){
     let sb=0,sr=0,sbr=0;
     sekolahMap[s].forEach(r=>{
@@ -175,16 +197,15 @@ function renderDetail(kec,list){
       else if(r.kondisiSaatIni==="Rusak Ringan") sr++;
       else if(r.kondisiSaatIni==="Rusak Berat") sbr++;
     });
-    sekolahLabels.push(s); baikArr.push(sb); ringanArr.push(sr); beratArr.push(sbr);
 
     html+=`<tr class="border-b">
       <td class="p-2">${s}</td><td>${sb}</td><td>${sr}</td><td>${sbr}</td>
       <td class="text-center">
-        <button onclick="toggleDetail('${s.replace(/'/g,"") }')" 
+        <button onclick="toggleDetail('${s.replace(/'/g,'') }')" 
           class="bg-blue-500 text-white px-2 py-1 rounded">+</button>
       </td>
     </tr>
-    <tr id="detail-${s.replace(/'/g,"")}" class="hidden">
+    <tr id="detail-${s.replace(/'/g,'')}" class="hidden">
       <td colspan="5">
         <table class="w-full border mt-2 text-xs">
           <thead class="bg-gray-100">
@@ -204,7 +225,6 @@ function renderDetail(kec,list){
   html+="</tbody></table>";
   detailDiv.innerHTML=html;
 
-  // pie chart kecamatan
   new Chart(document.getElementById("pieChart"),{
     type:"pie",
     data:{labels:["Baik","Rusak Ringan","Rusak Berat"],
