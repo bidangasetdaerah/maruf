@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard Rekap Data Kecamatan</title>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body{font-family:Arial, sans-serif;margin:20px;}
+    table{border-collapse:collapse;width:100%;margin-bottom:20px;}
+    th,td{border:1px solid #ccc;padding:8px;text-align:left;}
+    th{background:#f0f0f0;}
+    .chart-container{width:400px;height:400px;display:inline-block;}
+  </style>
+</head>
+<body>
+  <h1>Dashboard Rekap Data Kecamatan</h1>
+
+  <label for="filterKecamatan">Pilih Kecamatan:</label>
+  <select id="filterKecamatan" onchange="updateData()"></select>
+
+  <h2>Rekap Data Kecamatan</h2>
+  <table id="rekapTable">
+    <thead>
+      <tr>
+        <th>Kecamatan</th>
+        <th>Jumlah Sekolah</th>
+        <th>Jumlah Barang</th>
+        <th>Nilai Total (Rp)</th>
+        <th>Baik</th>
+        <th>Rusak Ringan</th>
+        <th>Rusak Berat</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <div class="chart-container"><canvas id="chartKondisi"></canvas></div>
+
+  <h2>Detail Sekolah</h2>
+  <div id="detailSekolah"></div>
+
+  <script>
+    const kecamatanEndpoints = {
+      "Banawa": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRd8vIhHDUbmD6I2aXLX7-_Ysemt2aXA__wKNGoKN0XWWSWCScv5aSmx06H0xkl8g/pub?gid=1917777904&single=true&output=csv",
+      "Banawa Selatan": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRd8vIhHDUbmD6I2aXLX7-_Ysemt2aXA__wKNGoKN0XWWSWCScv5aSmx06H0xkl8g/pub?gid=1236813870&single=true&output=csv",
+      "Banawa Tengah": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRd8vIhHDUbmD6I2aXLX7-_Ysemt2aXA__wKNGoKN0XWWSWCScv5aSmx06H0xkl8g/pub?gid=377081312&single=true&output=csv",
+      "Damsol": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRd8vIhHDUbmD6I2aXLX7-_Ysemt2aXA__wKNGoKN0XWWSWCScv5aSmx06H0xkl8g/pub?gid=1519589094&single=true&output=csv",
+      "Labuan": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRd8vIhHDUbmD6I2aXLX7-_Ysemt2aXA__wKNGoKN0XWWSWCScv5aSmx06H0xkl8g/pub?gid=1848034953&single=true&output=csv",
+      "Pinembani": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRd8vIhHDUbmD6I2aXLX7-_Ysemt2aXA__wKNGoKN0XWWSWCScv5aSmx06H0xkl8g/pub?gid=1584396349&single=true&output=csv",
+      "Sindue": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRd8vIhHDUbmD6I2aXLX7-_Ysemt2aXA__wKNGoKN0XWWSWCScv5aSmx06H0xkl8g/pub?gid=1158920952&single=true&output=csv",
+      "Sindue Tobata": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRd8vIhHDUbmD6I2aXLX7-_Ysemt2aXA__wKNGoKN0XWWSWCScv5aSmx06H0xkl8g/pub?gid=1584810132&single=true&output=csv",
+      "Sindue Tombusabora": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRd8vIhHDUbmD6I2aXLX7-_Ysemt2aXA__wKNGoKN0XWWSWCScv5aSmx06H0xkl8g/pub?gid=1697008085&single=true&output=csv",
+      "Sirenja": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRd8vIhHDUbmD6I2aXLX7-_Ysemt2aXA__wKNGoKN0XWWSWCScv5aSmx06H0xkl8g/pub?gid=654134763&single=true&output=csv",
+      "Sojol": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRd8vIhHDUbmD6I2aXLX7-_Ysemt2aXA__wKNGoKN0XWWSWCScv5aSmx06H0xkl8g/pub?gid=2004580613&single=true&output=csv",
+      "Sojol Utara": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRd8vIhHDUbmD6I2aXLX7-_Ysemt2aXA__wKNGoKN0XWWSWCScv5aSmx06H0xkl8g/pub?gid=1780097399&single=true&output=csv},
+      "Tanantovea": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRd8vIhHDUbmD6I2aXLX7-_Ysemt2aXA__wKNGoKN0XWWSWCScv5aSmx06H0xkl8g/pub?gid=1208978733&single=true&output=csv"
+    };
+
+    let dataKecamatan = {};
+    let chartInstance = null;
+
+    async function fetchData(url){
+      return new Promise((resolve,reject)=>{
+        Papa.parse(url,{
+          download:true,
+          header:true,
+          complete: res=> resolve(res.data),
+          error: err=> reject(err)
+        });
+      });
+    }
+
+    function parseNumber(val){
+      return parseFloat((val||"0").toString().replace(/[^0-9,.-]/g,"").replace(/\./g,"").replace(/,/g,"."))||0;
+    }
+
+    async function loadAllData(){
+      for(const [kec,url] of Object.entries(kecamatanEndpoints)){
+        const rawData = await fetchData(url);
+        dataKecamatan[kec] = rawData.map(r=>({
+          sekolah: r["Nama Sekolah"] || r["Pengguna Barang"] || "",
+          barang: r["Nama Barang"] || "",
+          nibar: r["NIBAR"] || r["No. Register"] || "",
+          konfirmasi: r["Konfirmasi Keberadaan"] || "Tidak Ditemukan",
+          kondisiSebelumnya: r["Kondisi Sebelumnya"] || "",
+          kondisiSaatIni: r["Kondisi Saat Ini"] || "",
+          nilai: parseNumber(r["Harga Perolehan"] || r["Nilai Perolehan"])
+        }));
+      }
+      populateFilter();
+      updateData();
+    }
+
+    function populateFilter(){
+      const sel=document.getElementById("filterKecamatan");
+      sel.innerHTML="<option value=''>Semua Kecamatan</option>";
+      Object.keys(dataKecamatan).forEach(kec=>{
+        const o=document.createElement("option");
+        o.value=kec;o.textContent=kec;sel.appendChild(o);
+      });
+    }
+
+    function updateData(){
+      const filter=document.getElementById("filterKecamatan").value;
+      const tbody=document.querySelector("#rekapTable tbody");
+      tbody.innerHTML="";
+      let totalBaik=0,totalRingan=0,totalBerat=0;
+      for(const [kec,rows] of Object.entries(dataKecamatan)){
+        if(filter && kec!==filter) continue;
+        let sekolahSet=new Set(),barang=0,totalNilai=0,baik=0,ringan=0,berat=0;
+        rows.forEach(r=>{
+          if(r.sekolah) sekolahSet.add(r.sekolah);
+          if(r.barang) barang++;
+          totalNilai+=r.nilai;
+          if(r.kondisiSaatIni==="Baik") baik++;
+          else if(r.kondisiSaatIni==="Rusak Ringan") ringan++;
+          else if(r.kondisiSaatIni==="Rusak Berat") berat++;
+        });
+        totalBaik+=baik; totalRingan+=ringan; totalBerat+=berat;
+        const tr=document.createElement("tr");
+        tr.innerHTML=`<td>${kec}</td><td>${sekolahSet.size}</td><td>${barang}</td><td>${totalNilai.toLocaleString("id-ID")}</td><td>${baik}</td><td>${ringan}</td><td>${berat}</td>`;
+        tbody.appendChild(tr);
+      }
+      drawChart(totalBaik,totalRingan,totalBerat);
+      showDetail(filter);
+    }
+
+    function drawChart(baik,ringan,berat){
+      const ctx=document.getElementById("chartKondisi").getContext("2d");
+      if(chartInstance) chartInstance.destroy();
+      chartInstance=new Chart(ctx,{
+        type:"pie",
+        data:{
+          labels:["Baik","Rusak Ringan","Rusak Berat"],
+          datasets:[{data:[baik,ringan,berat]}]
+        }
+      });
+    }
+
+    function showDetail(filter){
+      const container=document.getElementById("detailSekolah");
+      container.innerHTML="";
+      for(const [kec,rows] of Object.entries(dataKecamatan)){
+        if(filter && kec!==filter) continue;
+        const sekolahGroup={};
+        rows.forEach(r=>{
+          if(!r.sekolah) return;
+          if(!sekolahGroup[r.sekolah]) sekolahGroup[r.sekolah]=[];
+          sekolahGroup[r.sekolah].push(r);
+        });
+        for(const [sekolah,items] of Object.entries(sekolahGroup)){
+          const h3=document.createElement("h3");
+          h3.textContent=`${sekolah} (${kec})`;
+          container.appendChild(h3);
+          const table=document.createElement("table");
+          table.innerHTML=`<thead>
+            <tr><th>Nama Barang</th><th>NIBAR</th><th>Kondisi Sebelumnya</th><th>Kondisi Saat Ini</th><th>Nilai Perolehan (Rp)</th></tr>
+          </thead><tbody></tbody>`;
+          const tbody=table.querySelector("tbody");
+          items.forEach(it=>{
+            const tr=document.createElement("tr");
+            tr.innerHTML=`<td>${it.barang}</td><td>${it.nibar}</td><td>${it.kondisiSebelumnya}</td><td>${it.kondisiSaatIni}</td><td>${it.nilai.toLocaleString("id-ID")}</td>`;
+            tbody.appendChild(tr);
+          });
+          container.appendChild(table);
+        }
+      }
+    }
+
+    loadAllData();
+  </script>
+</body>
+</html>
