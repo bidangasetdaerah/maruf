@@ -1,28 +1,40 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>Dashboard Rekap Data Kecamatan</title>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.19.3/xlsx.full.min.js"></script>
   <style>
     body{font-family:Arial, sans-serif;margin:20px;}
-    table{border-collapse:collapse;width:100%;margin-bottom:20px;}
+    label{margin-right:8px;}
+    select{margin-right:16px;padding:6px;}
+    button{padding:8px 12px;margin:8px 0;}
+    table{border-collapse:collapse;width:100%;margin:16px 0;}
     th,td{border:1px solid #ccc;padding:8px;text-align:left;}
-    th{background:#f0f0f0;}
-    .chart-container{width:500px;height:400px;display:inline-block;vertical-align:top;margin:10px;}
-    .summary-box{padding:10px;margin-bottom:20px;background:#f9f9f9;border:1px solid #ccc;border-radius:6px;}
-    .summary-box strong{display:inline-block;width:160px;}
+    th{background:#f5f5f5;}
+    .wrap{display:flex;flex-wrap:wrap;gap:16px;}
+    .chart-card{flex:1 1 420px;max-width:620px;padding:12px;border:1px solid #e5e5e5;border-radius:8px;background:#fafafa;}
+    .summary-box{padding:12px;border:1px solid #e5e5e5;border-radius:8px;background:#fbfbfb;margin:12px 0;}
+    .summary-row{display:flex;flex-wrap:wrap;gap:16px}
+    .summary-item{min-width:220px}
+    .muted{color:#666;font-size:12px;margin-top:-6px}
   </style>
 </head>
 <body>
   <h1>Dashboard Rekap Data Kecamatan</h1>
 
-  <label for="filterKecamatan">Pilih Kecamatan:</label>
-  <select id="filterKecamatan" onchange="updateSekolahFilter()"></select>
+  <div>
+    <label for="filterKecamatan">Pilih Kecamatan:</label>
+    <select id="filterKecamatan" onchange="updateSekolahFilter()"></select>
 
-  <label for="filterSekolah">Pilih Sekolah:</label>
-  <select id="filterSekolah" onchange="updateData()"></select>
+    <label for="filterSekolah">Pilih Sekolah:</label>
+    <select id="filterSekolah" onchange="updateData()"></select>
+
+    <button onclick="exportExcel()">📥 Export Excel</button>
+    <div class="muted">Jika memilih sekolah, yang diekspor adalah detail barang sekolah tersebut. Jika tidak, tabel rekap kecamatan yang diekspor.</div>
+  </div>
 
   <div id="summaryKabupaten" class="summary-box"></div>
 
@@ -45,200 +57,328 @@
     <tbody></tbody>
   </table>
 
-  <div class="chart-container"><canvas id="chartKondisi"></canvas></div>
-  <div class="chart-container"><canvas id="chartSummary"></canvas></div>
+  <div class="wrap">
+    <div class="chart-card">
+      <h3>Pie – Rekap Kondisi Saat Ini (Kabupaten)</h3>
+      <canvas id="chartKondisi"></canvas>
+    </div>
+    <div class="chart-card">
+      <h3>Bar – Rekap per Kecamatan (Kondisi Saat Ini)</h3>
+      <canvas id="chartSummary"></canvas>
+    </div>
+  </div>
 
   <h2>Detail Sekolah</h2>
   <div id="detailSekolah"></div>
 
-  <script>
-    const kecamatanEndpoints = {
-     "Banawa": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRd8vIhHDUbmD6I2aXLX7-_Ysemt2aXA__wKNGoKN0XWWSWCScv5aSmx06H0xkl8g/pub?gid=1917777904&single=true&output=csv",
-    "Banawa Tengah": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRnykw5e_i3dwBIeTua-mpFExEJ4w6hROJ5F6OUHiiGpbtunldeKgXlhN_G-D1V8w/pub?gid=1454720232&single=true&output=csv",
-    "Banawa Selatan": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRhDJK33BtCz7KEi6DWgqheZBrcdgK0X9Pw1r28u5ec1MK-I-kP-QOqrsY0G2OnEQ/pub?gid=708970016&single=true&output=csv",
-    "Rio Pakava": "https://docs.google.com/spreadsheets/d/1_8YllqyTXGDZZCVeozFKAhGru2WS15Bp/export?format=csv",
-    "Pinembani": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQshgCYmG0DHxcwLUzhtUamXTYnWb8tR7WQwnJq9k7ldFz_JhV4GHDE-k_dMO_pSA/pub?gid=1860451546&single=true&output=csv",
-    "Tanantovea": "https://docs.google.com/spreadsheets/d/e/2PACX-1vR3MhjBMD3q8UIfOTdAUOHKMdeGcwr3y2YQGFcDmHDd0IVsOsAECl511LsNJ9ynow9cmY4yBpP1jENa/pub?gid=1200528899&single=true&output=csv",
-    "Labuan": "https://docs.google.com/spreadsheets/d/e/2PACX-1vT7WqNsmpUBIy0-lVm2JdGg1KUKwNgQPpbSyDuuFDwB1aGPY8gsZSBWmxIgiOeJNA/pub?gid=1615242439&single=true&output=csv",
-    "Sindue": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ2sjcmJjTCYD3p6-7pDQTmm3mCVphZIP2-5DGZOHxStucexMcdqPVsfsbnDouFcA/pub?gid=1920885371&single=true&output=csv",
-    "Sindue Tombusabora": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRYHOyrOQ_hNjC1L1FoIMVbbWES0dPGb1OaU6V--PV_lm0O97IHFvtPRhgRNXn_dA/pub?gid=1974330298&single=true&output=csv",
-    "Sindue Tobata": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQIbvzs-jZRcf1z0uV_Ahwh6dNdBgBHw66T358D9wd0-DHimDs8r4ajCvZwLa8Srg/pub?gid=801352666&single=true&output=csv",
-    "Sirenja": "https://docs.google.com/spreadsheets/d/e/2PACX-1vROhU6H6reNQxHKsAmYYgfcaSZyis1vALTmBkYhjAp7BGX_wNdA2cVdgOjFQIIgjQ/pub?output=csv",
-    "Balaesang": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQIf6mV6qgS6fmRe3jz305N8wCDdKWJcKKWSxHtybbo7xoERx15unD-x4rgyFxF-g/pub?gid=1401841928&single=true&output=csv",
-    "Balaesang Tanjung": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQRojLHXJ4W6IEdiNn34kZrMgr5QvPZllm85-sbgD0WxjG6vFMUMQz3QzzGnM-7pw/pub?gid=820099832&single=true&output=csv",
-    "Dampelas": "https://docs.google.com/spreadsheets/d/e/2PACX-1vR_BmCgfv-HOMRKzNMZ1aHL05CZsR7Ie0VZGRJTD29tX1C-ANiKASW1hB_PM69WuQ/pub?gid=1489077321&single=true&output=csv",
-    "Sojol": "https://docs.google.com/spreadsheets/d/e/2PACX-1vT64A3AbrmT4TK8fLj5ctUc3LLMESXVTOuw3nBd2qRTEFIljaxTBW3-Z5u4w7W2Ng/pub?gid=1781390946&single=true&output=csv",
-    "Sojol Utara": "https://docs.google.com/spreadsheets/d/e/2PACX-1vT41KwECicPb2EY8d8BP1f73RM3dhVWYDOxpaFlHZluKFy9owLzyVX7N7mIUm37Tw/pub?gid=502544387&single=true&output=csv"
-    };
+<script>
+/* ================== Konfigurasi sumber data ================== */
+const kecamatanEndpoints = {
+  "Banawa": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRd8vIhHDUbmD6I2aXLX7-_Ysemt2aXA__wKNGoKN0XWWSWCScv5aSmx06H0xkl8g/pub?gid=1917777904&single=true&output=csv",
+  "Banawa Tengah": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRnykw5e_i3dwBIeTua-mpFExEJ4w6hROJ5F6OUHiiGpbtunldeKgXlhN_G-D1V8w/pub?gid=1454720232&single=true&output=csv",
+  "Banawa Selatan": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRhDJK33BtCz7KEi6DWgqheZBrcdgK0X9Pw1r28u5ec1MK-I-kP-QOqrsY0G2OnEQ/pub?gid=708970016&single=true&output=csv",
+  "Rio Pakava": "https://docs.google.com/spreadsheets/d/1_8YllqyTXGDZZCVeozFKAhGru2WS15Bp/export?format=csv",
+  "Pinembani": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQshgCYmG0DHxcwLUzhtUamXTYnWb8tR7WQwnJq9k7ldFz_JhV4GHDE-k_dMO_pSA/pub?gid=1860451546&single=true&output=csv",
+  "Tanantovea": "https://docs.google.com/spreadsheets/d/e/2PACX-1vR3MhjBMD3q8UIfOTdAUOHKMdeGcwr3y2YQGFcDmHDd0IVsOsAECl511LsNJ9ynow9cmY4yBpP1jENa/pub?gid=1200528899&single=true&output=csv",
+  "Labuan": "https://docs.google.com/spreadsheets/d/e/2PACX-1vT7WqNsmpUBIy0-lVm2JdGg1KUKwNgQPpbSyDuuFDwB1aGPY8gsZSBWmxIgiOeJNA/pub?gid=1615242439&single=true&output=csv",
+  "Sindue": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ2sjcmJjTCYD3p6-7pDQTmm3mCVphZIP2-5DGZOHxStucexMcdqPVsfsbnDouFcA/pub?gid=1920885371&single=true&output=csv",
+  "Sindue Tombusabora": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRYHOyrOQ_hNjC1L1FoIMVbbWES0dPGb1OaU6V--PV_lm0O97IHFvtPRhgRNXn_dA/pub?gid=1974330298&single=true&output=csv",
+  "Sindue Tobata": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQIbvzs-jZRcf1z0uV_Ahwh6dNdBgBHw66T358D9wd0-DHimDs8r4ajCvZwLa8Srg/pub?gid=801352666&single=true&output=csv",
+  "Sirenja": "https://docs.google.com/spreadsheets/d/e/2PACX-1vROhU6H6reNQxHKsAmYYgfcaSZyis1vALTmBkYhjAp7BGX_wNdA2cVdgOjFQIIgjQ/pub?output=csv",
+  "Balaesang": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQIf6mV6qgS6fmRe3jz305N8wCDdKWJcKKWSxHtybbo7xoERx15unD-x4rgyFxF-g/pub?gid=1401841928&single=true&output=csv",
+  "Balaesang Tanjung": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQRojLHXJ4W6IEdiNn34kZrMgr5QvPZllm85-sbgD0WxjG6vFMUMQz3QzzGnM-7pw/pub?gid=820099832&single=true&output=csv",
+  "Dampelas": "https://docs.google.com/spreadsheets/d/e/2PACX-1vR_BmCgfv-HOMRKzNMZ1aHL05CZsR7Ie0VZGRJTD29tX1C-ANiKASW1hB_PM69WuQ/pub?gid=1489077321&single=true&output=csv",
+  "Sojol": "https://docs.google.com/spreadsheets/d/e/2PACX-1vT64A3AbrmT4TK8fLj5ctUc3LLMESXVTOuw3nBd2qRTEFIljaxTBW3-Z5u4w7W2Ng/pub?gid=1781390946&single=true&output=csv",
+  "Sojol Utara": "https://docs.google.com/spreadsheets/d/e/2PACX-1vT41KwECicPb2EY8d8BP1f73RM3dhVWYDOxpaFlHZluKFy9owLzyVX7N7mIUm37Tw/pub?gid=502544387&single=true&output=csv"
+};
 
-    let dataKecamatan = {};
-    let chartInstance = null;
-    let chartSummaryInstance = null;
+/* ================== State & Util ================== */
+let dataKecamatan = {}; // {kec: [rows]}
+let chartPieKab=null;
+let chartBarKec=null;
 
-    function normalizeKey(str){ return (str||"").toLowerCase().trim(); }
-    function parseNumber(val){
-      return parseFloat((val||"0").toString().replace(/[^0-9,.-]/g,"").replace(/\./g,"").replace(/,/g,"."))||0;
-    }
+const norm = s => (s||"").toLowerCase().trim();
+const parseNum = v => parseFloat((v??"0").toString().replace(/[^0-9,.-]/g,"").replace(/\./g,"").replace(/,/g,".")) || 0;
 
-    async function fetchData(url){
-      return new Promise((resolve,reject)=>{
-        Papa.parse(url,{download:true,header:true,skipEmptyLines:true,
-          complete: res=> resolve(res), error: err=> reject(err)});
-      });
-    }
+function groupBy(arr, key){
+  return arr.reduce((m, r)=>{
+    const k = r[key] || "";
+    if(!m[k]) m[k]=[];
+    m[k].push(r);
+    return m;
+  },{});
+}
 
-    async function loadAllData(){
-      for(const [kec,url] of Object.entries(kecamatanEndpoints)){
-        const parsed = await fetchData(url);
-        const headers = parsed.meta.fields;
-        const headersMap={}; headers.forEach(h=> headersMap[normalizeKey(h)]=h);
-        dataKecamatan[kec]=parsed.data.map(r=>({
-          sekolah: r[headersMap["pengguna barang"]] || "",
-          barang: r[headersMap["nama barang"]] || "",
-          nibar: r[headersMap["nibar"]] || r[headersMap["no. register"]] || "",
-          kondisiSebelumnya: r[headersMap["kondisi sebelumnya"]] || "",
-          kondisiSaatIni: r[headersMap["kondisi saat ini"]] || "",
-          nilai: parseNumber(r[headersMap["harga perolehan"]] || r[headersMap["nilai perolehan"]])
-        }));
-      }
-      populateFilter();
-      updateData();
-    }
+/* ================== Load & Map Data (Auto Detect Header) ================== */
+function mapRows(parsed){
+  const headers = parsed.meta.fields || [];
+  const hMap = {};
+  headers.forEach(h => hMap[norm(h)] = h);
 
-    function populateFilter(){
-      const sel=document.getElementById("filterKecamatan");
-      sel.innerHTML="<option value=''>Semua Kecamatan</option>";
-      Object.keys(dataKecamatan).forEach(kec=>{
-        const o=document.createElement("option");o.value=kec;o.textContent=kec;sel.appendChild(o);
-      });
-      updateSekolahFilter();
-    }
+  return parsed.data.map(r => ({
+    sekolah: r[hMap["pengguna barang"]] || "",
+    barang:  r[hMap["nama barang"]] || "",
+    nibar:   r[hMap["nibar"]] || r[hMap["no. register"]] || "",
+    kondisiSebelumnya: r[hMap["kondisi sebelumnya"]] || "",
+    kondisiSaatIni:    r[hMap["kondisi saat ini"]]    || "",
+    nilai: parseNum(r[hMap["harga perolehan"]] || r[hMap["nilai perolehan"]] || r[hMap["nilai"]])
+  }));
+}
 
-    function updateSekolahFilter(){
-      const kec=document.getElementById("filterKecamatan").value;
-      const selSekolah=document.getElementById("filterSekolah");
-      selSekolah.innerHTML="<option value=''>Semua Sekolah</option>";
-      if(kec && dataKecamatan[kec]){
-        const sekolahList=[...new Set(dataKecamatan[kec].map(r=>r.sekolah).filter(Boolean))];
-        sekolahList.forEach(s=>{
-          const o=document.createElement("option");o.value=s;o.textContent=s;selSekolah.appendChild(o);
-        });
-      }
-      updateData();
-    }
+function loadCSV(url){
+  return new Promise((resolve,reject)=>{
+    Papa.parse(url,{
+      download:true, header:true, skipEmptyLines:true,
+      complete: res => resolve(res),
+      error: err => reject(err)
+    });
+  });
+}
 
-    function updateData(){
-      const filterKec=document.getElementById("filterKecamatan").value;
-      const filterSekolah=document.getElementById("filterSekolah").value;
-      const tbody=document.querySelector("#rekapTable tbody");
-      tbody.innerHTML="";
-      let totalSekolah=new Set(), totalBarang=0, totalNilai=0;
-      let totalSebelum={baik:0,ringan:0,berat:0}, totalSekarang={baik:0,ringan:0,berat:0};
-      let perKecamatanSummary={};
+async function loadAll(){
+  for(const [kec,url] of Object.entries(kecamatanEndpoints)){
+    const parsed = await loadCSV(url);
+    dataKecamatan[kec] = mapRows(parsed);
+  }
+  populateFilters();
+  updateData();
+}
 
-      for(const [kec,rows] of Object.entries(dataKecamatan)){
-        if(filterKec && kec!==filterKec) continue;
-        let sekolahSet=new Set(),barang=0,nilai=0;
-        let sebelum={baik:0,ringan:0,berat:0}, sekarang={baik:0,ringan:0,berat:0};
-        rows.forEach(r=>{
-          if(filterSekolah && r.sekolah!==filterSekolah) return;
-          if(r.sekolah) {sekolahSet.add(r.sekolah); totalSekolah.add(r.sekolah);}
-          if(r.barang) {barang++; totalBarang++;}
-          nilai+=r.nilai; totalNilai+=r.nilai;
-          if(r.kondisiSebelumnya.toLowerCase().includes("baik")) sebelum.baik++;
-          else if(r.kondisiSebelumnya.toLowerCase().includes("ringan")) sebelum.ringan++;
-          else if(r.kondisiSebelumnya.toLowerCase().includes("berat")) sebelum.berat++;
-          if(r.kondisiSaatIni.toLowerCase().includes("baik")) sekarang.baik++;
-          else if(r.kondisiSaatIni.toLowerCase().includes("ringan")) sekarang.ringan++;
-          else if(r.kondisiSaatIni.toLowerCase().includes("berat")) sekarang.berat++;
-        });
-        totalSebelum.baik+=sebelum.baik; totalSebelum.ringan+=sebelum.ringan; totalSebelum.berat+=sebelum.berat;
-        totalSekarang.baik+=sekarang.baik; totalSekarang.ringan+=sekarang.ringan; totalSekarang.berat+=sekarang.berat;
+/* ================== Filters ================== */
+function populateFilters(){
+  const selKec = document.getElementById("filterKecamatan");
+  selKec.innerHTML = "<option value=''>Semua Kecamatan</option>";
+  Object.keys(dataKecamatan).forEach(k=>{
+    const o = document.createElement("option");
+    o.value = k; o.textContent = k;
+    selKec.appendChild(o);
+  });
+  updateSekolahFilter();
+}
 
-        perKecamatanSummary[kec]=sekarang;
+function updateSekolahFilter(){
+  const kec = document.getElementById("filterKecamatan").value;
+  const selSek = document.getElementById("filterSekolah");
+  selSek.innerHTML = "<option value=''>Semua Sekolah</option>";
+  if(kec && dataKecamatan[kec]){
+    const sekolahList = [...new Set(dataKecamatan[kec].map(r=>r.sekolah).filter(Boolean))].sort();
+    sekolahList.forEach(s=>{
+      const o=document.createElement("option");
+      o.value=s; o.textContent=s;
+      selSek.appendChild(o);
+    });
+  }
+  updateData();
+}
 
-        if(!filterSekolah){ // kalau sekolah dipilih → jangan tampilkan tabel rekap
-          const tr=document.createElement("tr");
-          tr.innerHTML=`<td>${kec}</td><td>${sekolahSet.size}</td><td>${barang}</td><td>${nilai.toLocaleString("id-ID")}</td>
-            <td>${sebelum.baik}</td><td>${sebelum.ringan}</td><td>${sebelum.berat}</td>
-            <td>${sekarang.baik}</td><td>${sekarang.ringan}</td><td>${sekarang.berat}</td>`;
-          tbody.appendChild(tr);
-        }
-      }
+/* ================== Main Update ================== */
+function updateData(){
+  const filterKec = document.getElementById("filterKecamatan").value;
+  const filterSek = document.getElementById("filterSekolah").value;
 
-      // summary kabupaten
-      document.getElementById("summaryKabupaten").innerHTML=`
-        <div><strong>Jumlah Sekolah:</strong> ${totalSekolah.size}</div>
-        <div><strong>Jumlah Barang:</strong> ${totalBarang}</div>
-        <div><strong>Total Nilai:</strong> Rp ${totalNilai.toLocaleString("id-ID")}</div>
-        <div><strong>Kondisi Sebelumnya:</strong> Baik: ${totalSebelum.baik}, Ringan: ${totalSebelum.ringan}, Berat: ${totalSebelum.berat}</div>
-        <div><strong>Kondisi Saat Ini:</strong> Baik: ${totalSekarang.baik}, Ringan: ${totalSekarang.ringan}, Berat: ${totalSekarang.berat}</div>
+  const tbody = document.querySelector("#rekapTable tbody");
+  tbody.innerHTML = "";
+
+  // Akumulasi kabupaten
+  let kabSekolah = new Set();
+  let kabBarang = 0;
+  let kabNilai = 0;
+  let totSeb = {baik:0, ringan:0, berat:0};
+  let totSek = {baik:0, ringan:0, berat:0};
+
+  // Ringkasan per kecamatan untuk bar chart
+  const perKec = {};
+
+  for(const [kec, rows] of Object.entries(dataKecamatan)){
+    if(filterKec && kec !== filterKec) continue;
+
+    let setSek = new Set();
+    let jBarang = 0;
+    let jNilai  = 0;
+    let sblm = {baik:0, ringan:0, berat:0};
+    let skrg = {baik:0, ringan:0, berat:0};
+
+    rows.forEach(r=>{
+      if(filterSek && r.sekolah !== filterSek) return;
+
+      if(r.sekolah){ setSek.add(r.sekolah); kabSekolah.add(r.sekolah); }
+      if(r.barang){ jBarang++; kabBarang++; }
+      jNilai += r.nilai; kabNilai += r.nilai;
+
+      // normalisasi isi kondisi
+      const ksbl = norm(r.kondisiSebelumnya);
+      const kskr = norm(r.kondisiSaatIni);
+      if(ksbl.includes("baik")) sblm.baik++;
+      else if(ksbl.includes("ringan")) sblm.ringan++;
+      else if(ksbl.includes("berat")) sblm.berat++;
+
+      if(kskr.includes("baik")) skrg.baik++;
+      else if(kskr.includes("ringan")) skrg.ringan++;
+      else if(kskr.includes("berat")) skrg.berat++;
+    });
+
+    // akumulasi kabupaten
+    totSeb.baik+=sblm.baik; totSeb.ringan+=sblm.ringan; totSeb.berat+=sblm.berat;
+    totSek.baik+=skrg.baik; totSek.ringan+=skrg.ringan; totSek.berat+=skrg.berat;
+
+    perKec[kec] = { ...skrg };
+
+    // tampilkan baris rekap hanya jika tidak memilih sekolah
+    if(!filterSek){
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${kec}</td>
+        <td>${setSek.size}</td>
+        <td>${jBarang}</td>
+        <td>${jNilai.toLocaleString("id-ID")}</td>
+        <td>${sblm.baik}</td><td>${sblm.ringan}</td><td>${sblm.berat}</td>
+        <td>${skrg.baik}</td><td>${skrg.ringan}</td><td>${skrg.berat}</td>
       `;
-
-      drawChart(totalSekarang.baik,totalSekarang.ringan,totalSekarang.berat);
-      if(!filterSekolah) drawSummaryChart(perKecamatanSummary);
-      showDetail(filterKec,filterSekolah);
+      tbody.appendChild(tr);
     }
+  }
 
-    function drawChart(baik,ringan,berat){
-      const ctx=document.getElementById("chartKondisi").getContext("2d");
-      if(chartInstance) chartInstance.destroy();
-      chartInstance=new Chart(ctx,{type:"pie",data:{
-        labels:["Baik","Rusak Ringan","Rusak Berat"],
-        datasets:[{data:[baik,ringan,berat],backgroundColor:["#4caf50","#ff9800","#f44336"]}]}
+  // Summary kabupaten
+  document.getElementById("summaryKabupaten").innerHTML = `
+    <div class="summary-row">
+      <div class="summary-item"><strong>Jumlah Sekolah:</strong> ${kabSekolah.size}</div>
+      <div class="summary-item"><strong>Jumlah Barang:</strong> ${kabBarang}</div>
+      <div class="summary-item"><strong>Total Nilai:</strong> Rp ${kabNilai.toLocaleString("id-ID")}</div>
+    </div>
+    <div class="summary-row">
+      <div class="summary-item"><strong>Kondisi Sebelumnya:</strong>
+        Baik: ${totSeb.baik}, Ringan: ${totSeb.ringan}, Berat: ${totSeb.berat}</div>
+      <div class="summary-item"><strong>Kondisi Saat Ini:</strong>
+        Baik: ${totSek.baik}, Ringan: ${totSek.ringan}, Berat: ${totSek.berat}</div>
+    </div>
+  `;
+
+  // Grafik
+  drawPieKab(totSek.baik, totSek.ringan, totSek.berat);
+  if(!filterSek) drawBarPerKec(perKec); // kalau pilih sekolah, bar per kec disembunyikan (tidak dirender ulang)
+
+  // Detail
+  renderDetail(filterKec, filterSek);
+}
+
+/* ================== Charts ================== */
+function drawPieKab(baik, ringan, berat){
+  const ctx = document.getElementById("chartKondisi").getContext("2d");
+  if(chartPieKab) chartPieKab.destroy();
+  chartPieKab = new Chart(ctx,{
+    type:"pie",
+    data:{
+      labels:["Baik","Rusak Ringan","Rusak Berat"],
+      datasets:[{data:[baik,ringan,berat], backgroundColor:["#4CAF50","#FFC107","#F44336"]}]
+    },
+    options:{plugins:{legend:{position:"bottom"}}}
+  });
+}
+
+function drawBarPerKec(perKec){
+  const ctx = document.getElementById("chartSummary").getContext("2d");
+  if(chartBarKec) chartBarKec.destroy();
+  const labels = Object.keys(perKec);
+  const baik   = labels.map(k=>perKec[k].baik||0);
+  const ringan = labels.map(k=>perKec[k].ringan||0);
+  const berat  = labels.map(k=>perKec[k].berat||0);
+
+  chartBarKec = new Chart(ctx,{
+    type:"bar",
+    data:{
+      labels,
+      datasets:[
+        {label:"Baik", data:baik,   backgroundColor:"#4CAF50"},
+        {label:"Rusak Ringan", data:ringan, backgroundColor:"#FFC107"},
+        {label:"Rusak Berat", data:berat,  backgroundColor:"#F44336"}
+      ]
+    },
+    options:{
+      responsive:true,
+      scales:{x:{stacked:true}, y:{stacked:true, beginAtZero:true}},
+      plugins:{legend:{position:"bottom"}}
+    }
+  });
+}
+
+/* ================== Detail Sekolah ================== */
+function renderDetail(filterKec, filterSek){
+  const container = document.getElementById("detailSekolah");
+  container.innerHTML = "";
+
+  for(const [kec, rows] of Object.entries(dataKecamatan)){
+    if(filterKec && kec !== filterKec) continue;
+
+    // Group per sekolah, dan hormati filter sekolah jika dipilih
+    const items = rows.filter(r => !filterSek || r.sekolah === filterSek);
+    const g = groupBy(items, "sekolah");
+
+    for(const [sekolah, list] of Object.entries(g)){
+      if(!sekolah) continue;
+      const h3 = document.createElement("h3");
+      h3.textContent = `${sekolah} (${kec})`;
+      container.appendChild(h3);
+
+      const table = document.createElement("table");
+      table.className = "detail-table";
+      table.innerHTML = `
+        <thead>
+          <tr>
+            <th>Nama Barang</th>
+            <th>NIBAR</th>
+            <th>Kondisi Sebelumnya</th>
+            <th>Kondisi Saat Ini</th>
+            <th>Nilai Perolehan (Rp)</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      `;
+      const tbody = table.querySelector("tbody");
+      list.forEach(it=>{
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${it.barang}</td>
+          <td>${it.nibar}</td>
+          <td>${it.kondisiSebelumnya}</td>
+          <td>${it.kondisiSaatIni}</td>
+          <td>${(it.nilai||0).toLocaleString("id-ID")}</td>
+        `;
+        tbody.appendChild(tr);
       });
+      container.appendChild(table);
     }
+  }
+}
 
-    function drawSummaryChart(perKecamatanSummary){
-      const ctx=document.getElementById("chartSummary").getContext("2d");
-      if(chartSummaryInstance) chartSummaryInstance.destroy();
-      const labels=Object.keys(perKecamatanSummary);
-      const baik=labels.map(k=>perKecamatanSummary[k].baik);
-      const ringan=labels.map(k=>perKecamatanSummary[k].ringan);
-      const berat=labels.map(k=>perKecamatanSummary[k].berat);
-      chartSummaryInstance=new Chart(ctx,{type:"bar",data:{
-        labels:labels,
-        datasets:[
-          {label:"Baik",data:baik,backgroundColor:"#4caf50"},
-          {label:"Rusak Ringan",data:ringan,backgroundColor:"#ff9800"},
-          {label:"Rusak Berat",data:berat,backgroundColor:"#f44336"}
-        ]},
-        options:{responsive:true,plugins:{legend:{position:"top"}}}
-      });
+/* ================== Export Excel ================== */
+function exportExcel(){
+  const kec = document.getElementById("filterKecamatan").value;
+  const sek = document.getElementById("filterSekolah").value;
+
+  // Jika sekolah dipilih → ekspor detail sekolah (table pertama di #detailSekolah)
+  if(sek){
+    const firstDetailTable = document.querySelector("#detailSekolah table");
+    if(!firstDetailTable){
+      alert("Tidak ada data detail untuk diekspor.");
+      return;
     }
+    const wb = XLSX.utils.table_to_book(firstDetailTable, {sheet:"Detail"});
+    XLSX.writeFile(wb, `Detail_${sanitizeFile(kec||"SemuaKecamatan")}_${sanitizeFile(sek)}.xlsx`);
+    return;
+  }
 
-    function showDetail(filterKec,filterSekolah){
-      const container=document.getElementById("detailSekolah");
-      container.innerHTML="";
-      for(const [kec,rows] of Object.entries(dataKecamatan)){
-        if(filterKec && kec!==filterKec) continue;
-        const sekolahGroup={};
-        rows.forEach(r=>{
-          if(filterSekolah && r.sekolah!==filterSekolah) return;
-          if(!r.sekolah) return;
-          if(!sekolahGroup[r.sekolah]) sekolahGroup[r.sekolah]=[];
-          sekolahGroup[r.sekolah].push(r);
-        });
-        for(const [sekolah,items] of Object.entries(sekolahGroup)){
-          const h3=document.createElement("h3");
-          h3.textContent=`${sekolah} (${kec})`;
-          container.appendChild(h3);
-          const table=document.createElement("table");
-          table.innerHTML=`<thead>
-            <tr><th>Nama Barang</th><th>NIBAR</th><th>Kondisi Sebelumnya</th><th>Kondisi Saat Ini</th><th>Nilai Perolehan (Rp)</th></tr>
-          </thead><tbody></tbody>`;
-          const tbody=table.querySelector("tbody");
-          items.forEach(it=>{
-            const tr=document.createElement("tr");
-            tr.innerHTML=`<td>${it.barang}</td><td>${it.nibar}</td><td>${it.kondisiSebelumnya}</td><td>${it.kondisiSaatIni}</td><td>${it.nilai.toLocaleString("id-ID")}</td>`;
-            tbody.appendChild(tr);
-          });
-          container.appendChild(table);
-        }
-      }
-    }
+  // Jika tidak pilih sekolah → ekspor tabel rekap kecamatan
+  const rekapTable = document.querySelector("#rekapTable");
+  const wb = XLSX.utils.table_to_book(rekapTable, {sheet:"Rekap"});
+  XLSX.writeFile(wb, `Rekap_${sanitizeFile(kec||"Kabupaten")}.xlsx`);
+}
 
-    loadAllData();
-  </script>
+function sanitizeFile(name){
+  return (name||"").replace(/[\\/:*?"<>|]+/g,"-").replace(/\s+/g,"_");
+}
+
+/* ================== Init ================== */
+loadAll();
+</script>
 </body>
 </html>
