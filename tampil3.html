@@ -25,15 +25,17 @@
       animation: spin 1s linear infinite;
       margin: 10px auto;
     }
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
   <h2>📊 Dashboard Aset Sekolah</h2>
 
+  <!-- Grafik Ringkasan Semua Kecamatan -->
+  <h3>Rekap Semua Kecamatan</h3>
+  <canvas id="summaryChart" width="400" height="400"></canvas>
+
+  <h3>Pilih Kecamatan</h3>
   <select id="kecamatanSelect" onchange="showDetail(this.value)">
     <option value="">-- Pilih Kecamatan --</option>
     <option>Banawa</option>
@@ -90,53 +92,73 @@ const dataKecamatan = {
 let schoolChartInstance=null;
 let schoolChartData={labels:[],baik:[],ringan:[],berat:[]};
 
+window.onload=()=>{ renderSummaryChart(); };
+
+// === RENDER REKAP SEMUA KECAMATAN ===
+async function renderSummaryChart(){
+  let totalBaik=0,totalRingan=0,totalBerat=0;
+  for(const k in dataKecamatan){
+    try{
+      const res=await fetch(dataKecamatan[k]);
+      const csv=await res.text();
+      const parsed=Papa.parse(csv,{header:true,skipEmptyLines:true});
+      parsed.data.forEach(r=>{
+        const kondisi=r["Kondisi Saat Ini"];
+        if(kondisi==="Baik") totalBaik++;
+        else if(kondisi==="Rusak Ringan") totalRingan++;
+        else if(kondisi==="Rusak Berat") totalBerat++;
+      });
+    }catch(e){ console.log("Error kecamatan",k,e); }
+  }
+  new Chart(document.getElementById("summaryChart"),{
+    type:"pie",
+    data:{
+      labels:["Baik","Rusak Ringan","Rusak Berat"],
+      datasets:[{data:[totalBaik,totalRingan,totalBerat],
+        backgroundColor:["#4CAF50","#FFC107","#F44336"]}]
+    },
+    options:{plugins:{legend:{position:"bottom"}}}
+  });
+}
+
+// === DETAIL PER KECAMATAN ===
 async function showDetail(kec){
   const detailDiv=document.getElementById("detail");
   const loading=document.getElementById("loading");
-
   if(!kec || !dataKecamatan[kec]){
     detailDiv.innerHTML="";
     document.getElementById("buttons").classList.add("hidden");
     return;
   }
-
-  loading.style.display="block";
-  detailDiv.innerHTML="";
-
-  try {
+  loading.style.display="block"; detailDiv.innerHTML="";
+  try{
     const response=await fetch(dataKecamatan[kec]);
     const csvText=await response.text();
     const parsed=Papa.parse(csvText,{header:true,skipEmptyLines:true});
     const list=parsed.data.map(r=>({
-      sekolah:r["Sekolah"],
+      sekolah:r["Pengguna Barang"], // ✅ pakai nama kolom yang benar
       barang:r["Nama Barang"],
       nibar:r["NIBAR"],
       kondisiSebelumnya:r["Kondisi Sebelumnya"],
       kondisiSaatIni:r["Kondisi Saat Ini"],
       nilai:parseInt(r["Nilai"])||0
     }));
-
     renderDetail(kec,list);
-
-  } catch(err){
+  }catch(err){
     detailDiv.innerHTML=`<p style="color:red">Gagal memuat data: ${err.message}</p>`;
-  } finally {
-    loading.style.display="none";
-  }
+  }finally{ loading.style.display="none"; }
 }
 
 function renderDetail(kec,list){
   const detailDiv=document.getElementById("detail");
   document.getElementById("buttons").classList.remove("hidden");
 
-  // group per sekolah
   const sekolahMap={};
   list.forEach(r=>{
     if(!sekolahMap[r.sekolah]) sekolahMap[r.sekolah]=[];
     sekolahMap[r.sekolah].push(r);
   });
 
-  // hitung total kondisi kecamatan
   let baik=0, ringan=0, berat=0;
   for(const s in sekolahMap){
     sekolahMap[s].forEach(r=>{
@@ -187,14 +209,12 @@ function renderDetail(kec,list){
   html+="</table>";
   detailDiv.innerHTML=html;
 
-  // pie chart
   new Chart(document.getElementById("pieChart"),{
     type:"pie",
     data:{labels:["Baik","Rusak Ringan","Rusak Berat"],
       datasets:[{data:[baik,ringan,berat],backgroundColor:["#4CAF50","#FFC107","#F44336"]}]}
   });
 
-  // simpan data sekolah untuk chart
   schoolChartData={labels:sekolahLabels,baik:baikArr,ringan:ringanArr,berat:beratArr};
   updateSchoolChart();
 }
@@ -223,8 +243,7 @@ function toggleDetail(id){
 
 function exportExcel(){
   const table=document.querySelector("#detail table");
-  const wb=XLSX.utils.table_to_book(table,{sheet:"Sheet1"});
-  XLSX.writeFile(wb,"data.xlsx");
+  const wb=XLSX.utils.table_to_book(table,{sheet:"Sheet1"}); XLSX.writeFile(wb,"data.xlsx");
 }
 
 async function exportPDF(){
