@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard KIB B - DINAS PENDIDIKAN DAN KEBUDAYAAN</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+/* === CSS tetap, hanya tambahan tombol download === */
+.download-btn { 
+  background:#10b981; 
+  color:white; 
+  border:none; 
+  padding:6px 12px; 
+  border-radius:6px; 
+  cursor:pointer; 
+  font-size:0.85rem; 
+}
+.download-btn:hover { background:#059669; }
+</style>
+</head>
+<body>
+
+<header>
+<div style="display:flex; align-items:center; gap:8px;">
+<img src="https://upload.wikimedia.org/wikipedia/commons/e/e5/Lambang_Kabupaten_Donggala_%282015-sekarang%29.png" alt="Logo" style="height:32px;">
+<h1>Dashboard KIB B</h1>
+</div>
+<div style="display:flex; align-items:center; gap:10px;">
+<nav>
+<a href="#rekapTable">Rekap</a>
+<a href="#sekolahSection">Sekolah</a>
+<a href="#about">Tentang</a>
+</nav>
+<button class="dark-toggle" onclick="toggleDarkMode()"><span id="darkIcon">🌙</span></button>
+<button class="download-btn" onclick="downloadExcel()">⬇️ Download Excel</button>
+</div>
+</header>
+
+<main>
+<h2 style="text-align:center;">DINAS PENDIDIKAN DAN KEBUDAYAAN</h2>
+
+<!-- Kontrol filter -->
+<div class="controls">
+<label><b>Filter Kecamatan:</b></label>
+<select id="filterKecamatan"><option value="all">Semua Kecamatan</option></select>
+<label><b>Cari Sekolah:</b></label>
+<input type="text" id="searchBox" placeholder="Ketik nama sekolah...">
+</div>
+
+<!-- Rekap Chart -->
+<div class="dashboard">
+<div class="chart-container"><h2>Rekap Konfirmasi Keberadaan</h2><canvas id="rekapKonfirmasi"></canvas></div>
+<div class="chart-container"><h2>Rekap Kondisi Barang</h2><canvas id="rekapKondisi"></canvas></div>
+<div class="chart-container"><h2>Rekap Nilai Perolehan per Kondisi</h2><canvas id="rekapNilai"></canvas></div>
+</div>
+
+<!-- Rekap Kecamatan -->
+<h2 style="padding-left:10px;">Rekap Per Kecamatan</h2>
+<div id="lastUpdate" class="last-update" style="padding-left:10px;">Memuat data...</div>
+<div style="padding: 0 10px;">
+<table id="rekapTable">
+<thead>
+<tr>
+<th>Kecamatan</th><th>Ditemukan</th><th>Tidak Ditemukan</th><th>Baik</th><th>Rusak Ringan</th><th>Rusak Berat</th><th>Nilai Perolehan (Rp)</th>
+</tr>
+</thead>
+<tbody></tbody>
+<tfoot>
+<tr style="font-weight:bold; background:#e5e7eb; color:black;">
+<td>Total</td><td id="totalDitemukan">0</td><td id="totalTidakDitemukan">0</td><td id="totalBaik">0</td><td id="totalRusakRingan">0</td><td id="totalRusakBerat">0</td><td id="totalNilai">0</td>
+</tr>
+</tfoot>
+</table>
+</div>
+
+<!-- Rekap Sekolah -->
+<div id="sekolahSection" style="padding:10px;"></div>
+</main>
+
+<footer><p>&copy; 2025 DINAS PENDIDIKAN DAN KEBUDAYAAN - Semua Hak Dilindungi.</p></footer>
+
+<script>
+// === fungsi toggle dark mode tetap ===
+function toggleDarkMode(){
+ document.body.classList.toggle('dark-mode');
+ document.getElementById("darkIcon").textContent=document.body.classList.contains("dark-mode")?"☀️":"🌙";
+}
+
+const kecamatanEndpoints = {
+ "Banawa": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRd8vIhHDUbmD6I2aXLX7-_Ysemt2aXA__wKNGoKN0XWWSWCScv5aSmx06H0xkl8g/pub?gid=1917777904&single=true&output=csv"
+ // dst (endpoint lain sama dengan kode anda sebelumnya) ...
+};
+
+let dataKecamatan={};
+let chartKonfirmasi, chartKondisi, chartNilai;
+
+function parseNumber(val){ return parseFloat((val||0).toString().replace(/\./g,"").replace(/,/g,"."))||0; }
+
+async function fetchData(url){
+ return new Promise(resolve=>{
+  Papa.parse(url,{download:true, header:true, complete:res=>resolve(res.data)});
+ });
+}
+
+async function loadAllData(){
+ for(const [kec,url] of Object.entries(kecamatanEndpoints)){
+   const rawData = await fetchData(url);
+   dataKecamatan[kec] = rawData.map(r=>({
+     sekolah:r["Nama Sekolah"]||r["Pengguna Barang"]||"",
+     barang:r["Nama Barang"]||"",
+     nibar:r["NIBAR"]||r["No. Register"]||"",
+     konfirmasi:r["Konfirmasi Keberadaan"]||"Tidak Ditemukan",
+     kondisi:r["Kondisi"]||"Baik",
+     nilai:parseNumber(r["Harga Perolehan"]||r["Nilai Perolehan"])
+   }));
+ }
+ populateFilter();
+ updateData();
+ setInterval(updateData,300000);
+}
+
+function populateFilter(){
+ const filter=document.getElementById("filterKecamatan");
+ Object.keys(dataKecamatan).forEach(k=>{
+   const opt=document.createElement("option"); opt.value=k; opt.textContent=k; filter.appendChild(opt);
+ });
+ filter.addEventListener("change",updateData);
+ document.getElementById("searchBox").addEventListener("input",updateData);
+}
+
+function updateData(){
+ const filter=document.getElementById("filterKecamatan").value;
+ const search=document.getElementById("searchBox").value.toLowerCase();
+ const tbody=document.querySelector("#rekapTable tbody");
+ tbody.innerHTML="";
+ document.getElementById("sekolahSection").innerHTML="";
+ let total={Ditemukan:0,Tidak:0,Baik:0,Ringan:0,Berat:0,Nilai:0};
+
+ for(const [kec,data] of Object.entries(dataKecamatan)){
+   if(filter!=="all" && filter!==kec) continue;
+   let ditemukan=0,tidak=0,baik=0,ringan=0,berat=0,nilai=0;
+   const sekolahMap={};
+   data.forEach(r=>{
+     if(search && !r.sekolah.toLowerCase().includes(search)) return;
+     if(r.konfirmasi==="Ditemukan") ditemukan++; else tidak++;
+     if(r.kondisi==="Baik") baik++;
+     else if(r.kondisi==="Rusak Ringan") ringan++;
+     else if(r.kondisi==="Rusak Berat") berat++;
+     nilai+=r.nilai;
+     if(!sekolahMap[r.sekolah]) sekolahMap[r.sekolah]={barang:0,nilai:0,detail:[],tidak:[],berat:[]};
+     sekolahMap[r.sekolah].barang++;
+     sekolahMap[r.sekolah].nilai+=r.nilai;
+     sekolahMap[r.sekolah].detail.push(r);
+     if(r.konfirmasi==="Tidak Ditemukan") sekolahMap[r.sekolah].tidak.push(r);
+     if(r.kondisi==="Rusak Berat") sekolahMap[r.sekolah].berat.push(r);
+   });
+   total.Ditemukan+=ditemukan; total.Tidak+=tidak; total.Baik+=baik; total.Ringan+=ringan; total.Berat+=berat; total.Nilai+=nilai;
+
+   const tr=document.createElement("tr");
+   tr.innerHTML=`<td>${kec}</td><td>${ditemukan}</td><td>${tidak}</td><td>${baik}</td><td>${ringan}</td><td>${berat}</td><td>${nilai.toLocaleString("id-ID")}</td>`;
+   tbody.appendChild(tr);
+
+   // tampilkan sekolah
+   const section=document.getElementById("sekolahSection");
+   let html=`<h3>Daftar Sekolah - ${kec}</h3>
+   <table>
+   <thead><tr><th>Nama Sekolah</th><th>Jumlah Barang</th><th>Nilai Perolehan</th><th>Tidak Ditemukan</th><th>Rusak Berat</th></tr></thead><tbody>`;
+   let idx=0;
+   for(const [sName,val] of Object.entries(sekolahMap)){
+     idx++; const detailId=`detail_${kec}_${idx}`;
+     html+=`<tr>
+       <td><button class="expand-btn" onclick="toggleDetail('${detailId}')">➕</button>${sName}</td>
+       <td>${val.barang}</td>
+       <td>${val.nilai.toLocaleString("id-ID")}</td>
+       <td>${val.tidak.length}</td>
+       <td>${val.berat.length}</td>
+     </tr>`;
+     // collapsible detail
+     html+=`<tr id="${detailId}" style="display:none;">
+       <td colspan="5">
+         <table style="width:100%; border:1px solid #ddd; font-size:0.8rem;">
+           <thead><tr><th>Nama Barang</th><th>NIBAR</th><th>Kondisi</th><th>Nilai Perolehan</th></tr></thead>
+           <tbody>`;
+     val.detail.forEach(it=>{
+       html+=`<tr><td>${it.barang}</td><td>${it.nibar}</td><td>${it.kondisi}</td><td>${it.nilai.toLocaleString("id-ID")}</td></tr>`;
+     });
+     html+=`</tbody></table>
+       </td></tr>`;
+   }
+   html+=`</tbody></table>`;
+   section.innerHTML+=html;
+ }
+
+ document.getElementById("totalDitemukan").textContent=total.Ditemukan;
+ document.getElementById("totalTidakDitemukan").textContent=total.Tidak;
+ document.getElementById("totalBaik").textContent=total.Baik;
+ document.getElementById("totalRusakRingan").textContent=total.Ringan;
+ document.getElementById("totalRusakBerat").textContent=total.Berat;
+ document.getElementById("totalNilai").textContent=total.Nilai.toLocaleString("id-ID");
+ document.getElementById("lastUpdate").textContent="Data terakhir diperbarui: "+new Date().toLocaleTimeString();
+ updateCharts(total);
+}
+
+function updateCharts(total){
+ const ctx1=document.getElementById("rekapKonfirmasi").getContext("2d");
+ const ctx2=document.getElementById("rekapKondisi").getContext("2d");
+ const ctx3=document.getElementById("rekapNilai").getContext("2d");
+ if(chartKonfirmasi) chartKonfirmasi.destroy();
+ if(chartKondisi) chartKondisi.destroy();
+ if(chartNilai) chartNilai.destroy();
+ chartKonfirmasi=new Chart(ctx1,{type:"pie",data:{labels:["Ditemukan","Tidak Ditemukan"],datasets:[{data:[total.Ditemukan,total.Tidak]}]}});
+ chartKondisi=new Chart(ctx2,{type:"bar",data:{labels:["Baik","Rusak Ringan","Rusak Berat"],datasets:[{data:[total.Baik,total.Ringan,total.Berat]}]}});
+ chartNilai=new Chart(ctx3,{type:"doughnut",data:{labels:["Nilai Barang"],datasets:[{data:[total.Nilai]}]}});
+}
+
+function toggleDetail(id){
+ const row=document.getElementById(id);
+ if(!row) return;
+ const btn=row.previousElementSibling.querySelector("button");
+ if(row.style.display==="none"){ row.style.display="table-row"; btn.textContent="➖"; }
+ else{ row.style.display="none"; btn.textContent="➕"; }
+}
+
+// === fungsi download Excel ===
+function downloadExcel(){
+ let wb = XLSX.utils.book_new();
+ for(const [kec,data] of Object.entries(dataKecamatan)){
+   let sheetData=[["Sekolah","Nama Barang","NIBAR","Konfirmasi","Kondisi","Nilai"]];
+   data.forEach(r=>{
+     sheetData.push([r.sekolah,r.barang,r.nibar,r.konfirmasi,r.kondisi,r.nilai]);
+   });
+   let ws = XLSX.utils.aoa_to_sheet(sheetData);
+   XLSX.utils.book_append_sheet(wb,ws,kec.substring(0,30)); // maksimal 31 karakter
+ }
+ XLSX.writeFile(wb,"Rekap_KIBB.xlsx");
+}
+
+loadAllData();
+</script>
+</body>
+</html>
