@@ -6,19 +6,37 @@
 <title>Dashboard KIB B - DINAS PENDIDIKAN DAN KEBUDAYAAN</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exceljs/dist/exceljs.min.js"></script>
 <style>
-/* === CSS tetap, hanya tambahan tombol download === */
-.download-btn { 
-  background:#10b981; 
-  color:white; 
-  border:none; 
-  padding:6px 12px; 
-  border-radius:6px; 
-  cursor:pointer; 
-  font-size:0.85rem; 
-}
-.download-btn:hover { background:#059669; }
+body { font-family:sans-serif; margin:0; background:#f9fafb; transition:0.3s; }
+header { position:fixed; top:0; left:0; right:0; background:#001f3f; color:white; padding:12px 15px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; z-index:1000; box-shadow:0 2px 6px rgba(0,0,0,0.2);}
+header h1 { margin:0; font-size:1.1rem; }
+header nav a { color:white; text-decoration:none; margin-right:10px; font-size:0.9rem;}
+header nav a:hover { text-decoration:underline; }
+.dark-toggle { background:none;border:none;color:white;font-size:1.4rem;cursor:pointer;}
+main { padding-top:85px; min-height:80vh;}
+footer { background:#001f3f;color:#f3f4f6;text-align:center;padding:15px 10px;font-size:0.85rem;}
+h2 { font-size:1.2rem;margin-top:20px; }
+h3 { font-size:1rem;margin-top:15px;color:#1f2937; }
+.dashboard { display:flex; flex-wrap:wrap; gap:10px; margin-top:15px; padding:0 10px; }
+.chart-container, table { background:white; border-radius:8px; padding:10px; box-shadow:0 2px 6px rgba(0,0,0,0.1); width:100%; }
+.chart-container { flex:1 1 250px; } /* ukuran diperkecil sedikit */
+canvas { width:100% !important; height:200px !important; } /* ukuran grafik diperkecil */
+table { width:100%; border-collapse:collapse; font-size:0.85rem; margin-top:10px; }
+th, td { border:1px solid #ddd; padding:6px; text-align:left; }
+th { background-color:#001f3f;color:white;font-size:0.8rem; }
+td { border:1px solid #ccc; }
+.last-update { font-size:0.8rem;color:#555;margin-top:5px; }
+.controls { margin:15px 10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+input, select { padding:5px; border:1px solid #ccc; border-radius:5px; cursor:pointer; }
+body.dark-mode { background:#111827; color:#f3f4f6; }
+body.dark-mode header, body.dark-mode footer { background:#0a192f; }
+body.dark-mode .chart-container, body.dark-mode table { background:#1f2937; color:#f3f4f6; }
+body.dark-mode th { background-color:#0a192f; }
+body.dark-mode td, body.dark-mode h3 { color:#f3f4f6; }
+body.dark-mode .last-update { color:#d1d5db; }
+button.expand-btn { background:#001f3f;color:white;border:none;padding:3px 6px;border-radius:4px;cursor:pointer;margin-right:5px; }
+button#downloadExcel { background:#001f3f;color:white;border:none;padding:6px 12px;border-radius:4px;cursor:pointer; margin-left:10px;}
 </style>
 </head>
 <body>
@@ -35,14 +53,13 @@
 <a href="#about">Tentang</a>
 </nav>
 <button class="dark-toggle" onclick="toggleDarkMode()"><span id="darkIcon">🌙</span></button>
-<button class="download-btn" onclick="downloadExcel()">⬇️ Download Excel</button>
+<button id="downloadExcel">Download Excel</button>
 </div>
 </header>
 
 <main>
 <h2 style="text-align:center;">DINAS PENDIDIKAN DAN KEBUDAYAAN</h2>
 
-<!-- Kontrol filter -->
 <div class="controls">
 <label><b>Filter Kecamatan:</b></label>
 <select id="filterKecamatan"><option value="all">Semua Kecamatan</option></select>
@@ -50,14 +67,12 @@
 <input type="text" id="searchBox" placeholder="Ketik nama sekolah...">
 </div>
 
-<!-- Rekap Chart -->
 <div class="dashboard">
 <div class="chart-container"><h2>Rekap Konfirmasi Keberadaan</h2><canvas id="rekapKonfirmasi"></canvas></div>
 <div class="chart-container"><h2>Rekap Kondisi Barang</h2><canvas id="rekapKondisi"></canvas></div>
 <div class="chart-container"><h2>Rekap Nilai Perolehan per Kondisi</h2><canvas id="rekapNilai"></canvas></div>
 </div>
 
-<!-- Rekap Kecamatan -->
 <h2 style="padding-left:10px;">Rekap Per Kecamatan</h2>
 <div id="lastUpdate" class="last-update" style="padding-left:10px;">Memuat data...</div>
 <div style="padding: 0 10px;">
@@ -76,19 +91,18 @@
 </table>
 </div>
 
-<!-- Rekap Sekolah -->
 <div id="sekolahSection" style="padding:10px;"></div>
 </main>
 
 <footer><p>&copy; 2025 DINAS PENDIDIKAN DAN KEBUDAYAAN - Semua Hak Dilindungi.</p></footer>
 
 <script>
-// === fungsi toggle dark mode tetap ===
 function toggleDarkMode(){
- document.body.classList.toggle('dark-mode');
- document.getElementById("darkIcon").textContent=document.body.classList.contains("dark-mode")?"☀️":"🌙";
+document.body.classList.toggle('dark-mode');
+document.getElementById("darkIcon").textContent=document.body.classList.contains("dark-mode")?"☀️":"🌙";
 }
 
+// --- Data dan chart ---
 const kecamatanEndpoints = {
 "Banawa": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRd8vIhHDUbmD6I2aXLX7-_Ysemt2aXA__wKNGoKN0XWWSWCScv5aSmx06H0xkl8g/pub?gid=1917777904&single=true&output=csv",
     "Banawa Tengah": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRnykw5e_i3dwBIeTua-mpFExEJ4w6hROJ5F6OUHiiGpbtunldeKgXlhN_G-D1V8w/pub?gid=1454720232&single=true&output=csv",
@@ -114,143 +128,162 @@ let chartKonfirmasi, chartKondisi, chartNilai;
 function parseNumber(val){ return parseFloat((val||0).toString().replace(/\./g,"").replace(/,/g,"."))||0; }
 
 async function fetchData(url){
- return new Promise(resolve=>{
-  Papa.parse(url,{download:true, header:true, complete:res=>resolve(res.data)});
- });
+return new Promise(resolve=>{ Papa.parse(url,{download:true, header:true, complete:res=>resolve(res.data)}); });
 }
 
 async function loadAllData(){
- for(const [kec,url] of Object.entries(kecamatanEndpoints)){
-   const rawData = await fetchData(url);
-   dataKecamatan[kec] = rawData.map(r=>({
-     sekolah:r["Nama Sekolah"]||r["Pengguna Barang"]||"",
-     barang:r["Nama Barang"]||"",
-     nibar:r["NIBAR"]||r["No. Register"]||"",
-     konfirmasi:r["Konfirmasi Keberadaan"]||"Tidak Ditemukan",
-     kondisi:r["Kondisi"]||"Baik",
-     nilai:parseNumber(r["Harga Perolehan"]||r["Nilai Perolehan"])
-   }));
- }
- populateFilter();
- updateData();
- setInterval(updateData,300000);
+for(const [kec,url] of Object.entries(kecamatanEndpoints)){
+const rawData = await fetchData(url);
+dataKecamatan[kec] = rawData.map(r=>({
+sekolah:r["Nama Sekolah"]||r["Pengguna Barang"]||"",
+barang:r["Nama Barang"]||"",
+nibar:r["NIBAR"]||r["No. Register"]||"",
+konfirmasi:r["Konfirmasi Keberadaan"]||"Tidak Ditemukan",
+kondisi:r["Kondisi"]||"Baik",
+nilai:parseNumber(r["Harga Perolehan"]||r["Nilai Perolehan"])
+}));
+}
+populateFilter();
+updateData();
+setInterval(updateData,300000);
 }
 
 function populateFilter(){
- const filter=document.getElementById("filterKecamatan");
- Object.keys(dataKecamatan).forEach(k=>{
-   const opt=document.createElement("option"); opt.value=k; opt.textContent=k; filter.appendChild(opt);
- });
- filter.addEventListener("change",updateData);
- document.getElementById("searchBox").addEventListener("input",updateData);
+const filter=document.getElementById("filterKecamatan");
+Object.keys(dataKecamatan).forEach(k=>{
+const opt=document.createElement("option"); opt.value=k; opt.textContent=k; filter.appendChild(opt);
+});
+filter.addEventListener("change",updateData);
+document.getElementById("searchBox").addEventListener("input",updateData);
 }
 
 function updateData(){
- const filter=document.getElementById("filterKecamatan").value;
- const search=document.getElementById("searchBox").value.toLowerCase();
- const tbody=document.querySelector("#rekapTable tbody");
- tbody.innerHTML="";
- document.getElementById("sekolahSection").innerHTML="";
- let total={Ditemukan:0,Tidak:0,Baik:0,Ringan:0,Berat:0,Nilai:0};
+const filter=document.getElementById("filterKecamatan").value;
+const search=document.getElementById("searchBox").value.toLowerCase();
+const tbody=document.querySelector("#rekapTable tbody");
+tbody.innerHTML="";
+document.getElementById("sekolahSection").innerHTML="";
+let total={Ditemukan:0,Tidak:0,Baik:0,Ringan:0,Berat:0,Nilai:0};
 
- for(const [kec,data] of Object.entries(dataKecamatan)){
-   if(filter!=="all" && filter!==kec) continue;
-   let ditemukan=0,tidak=0,baik=0,ringan=0,berat=0,nilai=0;
-   const sekolahMap={};
-   data.forEach(r=>{
-     if(search && !r.sekolah.toLowerCase().includes(search)) return;
-     if(r.konfirmasi==="Ditemukan") ditemukan++; else tidak++;
-     if(r.kondisi==="Baik") baik++;
-     else if(r.kondisi==="Rusak Ringan") ringan++;
-     else if(r.kondisi==="Rusak Berat") berat++;
-     nilai+=r.nilai;
-     if(!sekolahMap[r.sekolah]) sekolahMap[r.sekolah]={barang:0,nilai:0,detail:[],tidak:[],berat:[]};
-     sekolahMap[r.sekolah].barang++;
-     sekolahMap[r.sekolah].nilai+=r.nilai;
-     sekolahMap[r.sekolah].detail.push(r);
-     if(r.konfirmasi==="Tidak Ditemukan") sekolahMap[r.sekolah].tidak.push(r);
-     if(r.kondisi==="Rusak Berat") sekolahMap[r.sekolah].berat.push(r);
-   });
-   total.Ditemukan+=ditemukan; total.Tidak+=tidak; total.Baik+=baik; total.Ringan+=ringan; total.Berat+=berat; total.Nilai+=nilai;
+for(const [kec,data] of Object.entries(dataKecamatan)){
+if(filter!=="all" && filter!==kec) continue;
+let ditemukan=0,tidak=0,baik=0,ringan=0,berat=0,nilai=0;
+const sekolahMap={};
+data.forEach(r=>{
+if(search && !r.sekolah.toLowerCase().includes(search)) return;
+if(r.konfirmasi==="Ditemukan") ditemukan++; else tidak++;
+if(r.kondisi==="Baik") baik++;
+else if(r.kondisi==="Rusak Ringan") ringan++;
+else if(r.kondisi==="Rusak Berat") berat++;
+nilai+=r.nilai;
+if(!sekolahMap[r.sekolah]) sekolahMap[r.sekolah]={barang:0,nilai:0,detail:[]};
+sekolahMap[r.sekolah].barang++;
+sekolahMap[r.sekolah].nilai+=r.nilai;
+sekolahMap[r.sekolah].detail.push(r);
+});
+total.Ditemukan+=ditemukan; total.Tidak+=tidak; total.Baik+=baik; total.Ringan+=ringan; total.Berat+=berat; total.Nilai+=nilai;
 
-   const tr=document.createElement("tr");
-   tr.innerHTML=`<td>${kec}</td><td>${ditemukan}</td><td>${tidak}</td><td>${baik}</td><td>${ringan}</td><td>${berat}</td><td>${nilai.toLocaleString("id-ID")}</td>`;
-   tbody.appendChild(tr);
+const tr=document.createElement("tr");
+tr.innerHTML=`<td>${kec}</td><td>${ditemukan}</td><td>${tidak}</td><td>${baik}</td><td>${ringan}</td><td>${berat}</td><td>${nilai.toLocaleString("id-ID",{minimumFractionDigits:2, maximumFractionDigits:2})}</td>`;
+tbody.appendChild(tr);
 
-   // tampilkan sekolah
-   const section=document.getElementById("sekolahSection");
-   let html=`<h3>Daftar Sekolah - ${kec}</h3>
-   <table>
-   <thead><tr><th>Nama Sekolah</th><th>Jumlah Barang</th><th>Nilai Perolehan</th><th>Tidak Ditemukan</th><th>Rusak Berat</th></tr></thead><tbody>`;
-   let idx=0;
-   for(const [sName,val] of Object.entries(sekolahMap)){
-     idx++; const detailId=`detail_${kec}_${idx}`;
-     html+=`<tr>
-       <td><button class="expand-btn" onclick="toggleDetail('${detailId}')">➕</button>${sName}</td>
-       <td>${val.barang}</td>
-       <td>${val.nilai.toLocaleString("id-ID")}</td>
-       <td>${val.tidak.length}</td>
-       <td>${val.berat.length}</td>
-     </tr>`;
-     // collapsible detail
-     html+=`<tr id="${detailId}" style="display:none;">
-       <td colspan="5">
-         <table style="width:100%; border:1px solid #ddd; font-size:0.8rem;">
-           <thead><tr><th>Nama Barang</th><th>NIBAR</th><th>Kondisi</th><th>Nilai Perolehan</th></tr></thead>
-           <tbody>`;
-     val.detail.forEach(it=>{
-       html+=`<tr><td>${it.barang}</td><td>${it.nibar}</td><td>${it.kondisi}</td><td>${it.nilai.toLocaleString("id-ID")}</td></tr>`;
-     });
-     html+=`</tbody></table>
-       </td></tr>`;
-   }
-   html+=`</tbody></table>`;
-   section.innerHTML+=html;
- }
+const section=document.getElementById("sekolahSection");
+let html=`<h3>Daftar Sekolah - ${kec}</h3><table><thead><tr><th>Nama Sekolah</th><th>Jumlah Barang</th><th>Nilai Perolehan (Rp)</th></tr></thead><tbody>`;
+let idx=0;
+for(const [sName,val] of Object.entries(sekolahMap)){
+idx++; const detailId=`detail_${kec}_${idx}`;
+html+=`<tr><td><button class="expand-btn" onclick="toggleDetail('${detailId}')">➕</button>${sName}</td><td>${val.barang}</td><td>${val.nilai.toLocaleString("id-ID",{minimumFractionDigits:2, maximumFractionDigits:2})}</td></tr>`;
+html+=`<tr id="${detailId}" style="display:none;"><td colspan="3"><table style="width:100%; border:1px solid #ccc; font-size:0.8rem;"><thead><tr><th>Nama Barang</th><th>NIBAR</th><th>Kondisi</th><th>Nilai Perolehan (Rp)</th></tr></thead><tbody>`;
+val.detail.forEach(it=>{html+=`<tr><td>${it.barang}</td><td>${it.nibar}</td><td>${it.kondisi}</td><td>${it.nilai.toLocaleString("id-ID",{minimumFractionDigits:2, maximumFractionDigits:2})}</td></tr>`});
+html+=`</tbody></table></td></tr>`;
+}
+html+=`</tbody></table>`; section.innerHTML+=html;
+}
 
- document.getElementById("totalDitemukan").textContent=total.Ditemukan;
- document.getElementById("totalTidakDitemukan").textContent=total.Tidak;
- document.getElementById("totalBaik").textContent=total.Baik;
- document.getElementById("totalRusakRingan").textContent=total.Ringan;
- document.getElementById("totalRusakBerat").textContent=total.Berat;
- document.getElementById("totalNilai").textContent=total.Nilai.toLocaleString("id-ID");
- document.getElementById("lastUpdate").textContent="Data terakhir diperbarui: "+new Date().toLocaleTimeString();
- updateCharts(total);
+document.getElementById("totalDitemukan").textContent=total.Ditemukan;
+document.getElementById("totalTidakDitemukan").textContent=total.Tidak;
+document.getElementById("totalBaik").textContent=total.Baik;
+document.getElementById("totalRusakRingan").textContent=total.Ringan;
+document.getElementById("totalRusakBerat").textContent=total.Berat;
+document.getElementById("totalNilai").textContent=total.Nilai.toLocaleString("id-ID",{minimumFractionDigits:2, maximumFractionDigits:2});
+document.getElementById("lastUpdate").textContent="Data terakhir diperbarui: "+new Date().toLocaleTimeString();
+updateCharts(total);
 }
 
 function updateCharts(total){
- const ctx1=document.getElementById("rekapKonfirmasi").getContext("2d");
- const ctx2=document.getElementById("rekapKondisi").getContext("2d");
- const ctx3=document.getElementById("rekapNilai").getContext("2d");
- if(chartKonfirmasi) chartKonfirmasi.destroy();
- if(chartKondisi) chartKondisi.destroy();
- if(chartNilai) chartNilai.destroy();
- chartKonfirmasi=new Chart(ctx1,{type:"pie",data:{labels:["Ditemukan","Tidak Ditemukan"],datasets:[{data:[total.Ditemukan,total.Tidak]}]}});
- chartKondisi=new Chart(ctx2,{type:"bar",data:{labels:["Baik","Rusak Ringan","Rusak Berat"],datasets:[{data:[total.Baik,total.Ringan,total.Berat]}]}});
- chartNilai=new Chart(ctx3,{type:"doughnut",data:{labels:["Nilai Barang"],datasets:[{data:[total.Nilai]}]}});
+const ctx1=document.getElementById("rekapKonfirmasi").getContext("2d");
+const ctx2=document.getElementById("rekapKondisi").getContext("2d");
+const ctx3=document.getElementById("rekapNilai").getContext("2d");
+if(chartKonfirmasi) chartKonfirmasi.destroy();
+if(chartKondisi) chartKondisi.destroy();
+if(chartNilai) chartNilai.destroy();
+chartKonfirmasi=new Chart(ctx1,{type:"pie",data:{labels:["Ditemukan","Tidak Ditemukan"],datasets:[{data:[total.Ditemukan,total.Tidak]}]}});
+chartKondisi=new Chart(ctx2,{type:"bar",data:{labels:["Baik","Rusak Ringan","Rusak Berat"],datasets:[{data:[total.Baik,total.Ringan,total.Berat]}]}});
+chartNilai=new Chart(ctx3,{type:"doughnut",data:{labels:["Nilai Barang"],datasets:[{data:[total.Nilai]}]}});
 }
 
 function toggleDetail(id){
- const row=document.getElementById(id);
- if(!row) return;
- const btn=row.previousElementSibling.querySelector("button");
- if(row.style.display==="none"){ row.style.display="table-row"; btn.textContent="➖"; }
- else{ row.style.display="none"; btn.textContent="➕"; }
+const row=document.getElementById(id);
+if(!row) return;
+const btn=row.previousElementSibling.querySelector("button");
+if(row.style.display==="none"){ row.style.display="table-row"; btn.textContent="➖"; }
+else{ row.style.display="none"; btn.textContent="➕"; }
 }
 
-// === fungsi download Excel ===
-function downloadExcel(){
- let wb = XLSX.utils.book_new();
- for(const [kec,data] of Object.entries(dataKecamatan)){
-   let sheetData=[["Sekolah","Nama Barang","NIBAR","Konfirmasi","Kondisi","Nilai"]];
-   data.forEach(r=>{
-     sheetData.push([r.sekolah,r.barang,r.nibar,r.konfirmasi,r.kondisi,r.nilai]);
-   });
-   let ws = XLSX.utils.aoa_to_sheet(sheetData);
-   XLSX.utils.book_append_sheet(wb,ws,kec.substring(0,30)); // maksimal 31 karakter
- }
- XLSX.writeFile(wb,"Rekap_KIBB.xlsx");
+// --- Download Excel ---
+document.getElementById("downloadExcel").addEventListener("click", async ()=>{
+const wb = new ExcelJS.Workbook();
+wb.creator = 'DINAS PENDIDIKAN DAN KEBUDAYAAN';
+wb.created = new Date();
+const periodeLaporan = "Tahun 2025";
+
+// Loop per kecamatan
+for(const [kec,data] of Object.entries(dataKecamatan)){
+  const ws = wb.addWorksheet(kec);
+  // Header
+  ws.addRow(["DINAS PENDIDIKAN DAN KEBUDAYAAN"]);
+  ws.addRow(["KABUPATEN DONGGALA"]);
+  ws.addRow(["Jl. Jati No. 12, Kel. Gunung Bale, Kec. Banawa"]);
+  ws.addRow([]);
+  ws.addRow([`Rekapitulasi Inventaris Barang Milik Daerah (KIB B) - Kecamatan ${kec}`]);
+  ws.addRow([`Periode: ${periodeLaporan}`]);
+  ws.addRow([]);
+  // Tabel
+  ws.addRow(["Nama Sekolah","Jumlah Barang","Ditemukan","Tidak Ditemukan","Baik","Rusak Ringan","Rusak Berat","Nilai Perolehan (Rp)"]);
+  data.forEach(r=>{
+    ws.addRow([
+      r.sekolah,
+      1,
+      r.konfirmasi==="Ditemukan"?1:0,
+      r.konfirmasi!=="Ditemukan"?1:0,
+      r.kondisi==="Baik"?1:0,
+      r.kondisi==="Rusak Ringan"?1:0,
+      r.kondisi==="Rusak Berat"?1:0,
+      r.nilai.toFixed(2)
+    ]);
+  });
+  // Footer resmi
+  ws.addRow([]);
+  ws.addRow([]);
+  ws.addRow([]);
+  ws.addRow(["","","A.n Kepala Dinas Pendidikan dan Kebudayaan"]);
+  ws.addRow([]);
+  ws.addRow([]);
+  ws.addRow([]);
+  ws.addRow(["","","IRAWAN PANGIDEN, S.IP., M.Si"]);
+  ws.addRow(["","","NIP. 19750331 199403 1 003"]);
 }
+
+// Generate Excel
+const buf = await wb.xlsx.writeBuffer();
+const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+const url = URL.createObjectURL(blob);
+const a = document.createElement("a");
+a.href = url;
+a.download = "Rekap_KIBB.xlsx";
+a.click();
+URL.revokeObjectURL(url);
+});
 
 loadAllData();
 </script>
