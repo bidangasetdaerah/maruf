@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Rekap KIB B - Dinas Pendidikan Donggala</title>
+  <script src="https://cdn.jsdelivr.net/npm/exceljs/dist/exceljs.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; margin:20px; }
+    .header { display:flex; align-items:center; border-bottom:2px solid black; padding-bottom:10px; margin-bottom:20px; }
+    .header img { height:70px; margin-right:15px; }
+    .header .instansi { font-size:14px; font-weight:bold; text-transform:uppercase; }
+    .periode { margin-top:5px; font-size:13px; font-style:italic; }
+    button { background:#001f3f;color:white;border:none;padding:6px 12px;border-radius:4px;cursor:pointer; margin-right:5px; }
+    table { border-collapse:collapse; width:100%; margin-top:15px; }
+    th, td { border:1px solid black; padding:4px; font-size:12px; }
+    th { background:#f0f0f0; }
+    .total { background:yellow; font-weight:bold; }
+    .chart-container { width:70%; height:300px; margin:20px auto; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <img src="https://upload.wikimedia.org/wikipedia/commons/e/e5/Lambang_Kabupaten_Donggala_%282015-sekarang%29.png" alt="Logo">
+    <div>
+      <div class="instansi">DINAS PENDIDIKAN DAN KEBUDAYAAN<br>KABUPATEN DONGGALA</div>
+      <div>Alamat: Jalan Jati, Kelurahan Gunung Bale</div>
+      <div class="periode">Periode: Tahun 2025</div>
+    </div>
+  </div>
+
+  <button id="downloadExcel">⬇️ Download Excel</button>
+  <button id="downloadPDF">⬇️ Download PDF</button>
+
+  <div class="chart-container">
+    <canvas id="rekapChart"></canvas>
+  </div>
+  <div class="chart-container">
+    <canvas id="pieChart"></canvas>
+  </div>
+
+  <table id="rekapTable">
+    <thead>
+      <tr>
+        <th>Kecamatan</th><th>Ditemukan</th><th>Tidak Ditemukan</th>
+        <th>Baik</th><th>Rusak Ringan</th><th>Rusak Berat</th><th>Nilai Perolehan (Rp)</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+<script>
+const dataKecamatan = {
+  "Banawa": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRd8vIhHDUbmD6I2aXLX7-_Ysemt2aXA__wKNGoKN0XWWSWCScv5aSmx06H0xkl8g/pub?gid=1917777904&single=true&output=csv",
+    "Banawa Tengah": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRnykw5e_i3dwBIeTua-mpFExEJ4w6hROJ5F6OUHiiGpbtunldeKgXlhN_G-D1V8w/pub?gid=1454720232&single=true&output=csv",
+    "Banawa Selatan": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRhDJK33BtCz7KEi6DWgqheZBrcdgK0X9Pw1r28u5ec1MK-I-kP-QOqrsY0G2OnEQ/pub?gid=708970016&single=true&output=csv",
+    "Rio Pakava": "https://docs.google.com/spreadsheets/d/1_8YllqyTXGDZZCVeozFKAhGru2WS15Bp/export?format=csv",
+    "Pinembani": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQshgCYmG0DHxcwLUzhtUamXTYnWb8tR7WQwnJq9k7ldFz_JhV4GHDE-k_dMO_pSA/pub?gid=1860451546&single=true&output=csv",
+    "Tanantovea": "https://docs.google.com/spreadsheets/d/e/2PACX-1vR3MhjBMD3q8UIfOTdAUOHKMdeGcwr3y2YQGFcDmHDd0IVsOsAECl511LsNJ9ynow9cmY4yBpP1jENa/pub?gid=1200528899&single=true&output=csv",
+    "Labuan": "https://docs.google.com/spreadsheets/d/e/2PACX-1vT7WqNsmpUBIy0-lVm2JdGg1KUKwNgQPpbSyDuuFDwB1aGPY8gsZSBWmxIgiOeJNA/pub?gid=1615242439&single=true&output=csv",
+    "Sindue": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ2sjcmJjTCYD3p6-7pDQTmm3mCVphZIP2-5DGZOHxStucexMcdqPVsfsbnDouFcA/pub?gid=1920885371&single=true&output=csv",
+    "Sindue Tombusabora": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRYHOyrOQ_hNjC1L1FoIMVbbWES0dPGb1OaU6V--PV_lm0O97IHFvtPRhgRNXn_dA/pub?gid=1974330298&single=true&output=csv",
+    "Sindue Tobata": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQIbvzs-jZRcf1z0uV_Ahwh6dNdBgBHw66T358D9wd0-DHimDs8r4ajCvZwLa8Srg/pub?gid=801352666&single=true&output=csv",
+    "Sirenja": "https://docs.google.com/spreadsheets/d/e/2PACX-1vROhU6H6reNQxHKsAmYYgfcaSZyis1vALTmBkYhjAp7BGX_wNdA2cVdgOjFQIIgjQ/pub?output=csv",
+    "Balaesang": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQIf6mV6qgS6fmRe3jz305N8wCDdKWJcKKWSxHtybbo7xoERx15unD-x4rgyFxF-g/pub?gid=1401841928&single=true&output=csv",
+    "Balaesang Tanjung": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQRojLHXJ4W6IEdiNn34kZrMgr5QvPZllm85-sbgD0WxjG6vFMUMQz3QzzGnM-7pw/pub?gid=820099832&single=true&output=csv",
+    "Dampelas": "https://docs.google.com/spreadsheets/d/e/2PACX-1vR_BmCgfv-HOMRKzNMZ1aHL05CZsR7Ie0VZGRJTD29tX1C-ANiKASW1hB_PM69WuQ/pub?gid=1489077321&single=true&output=csv",
+    "Sojol": "https://docs.google.com/spreadsheets/d/e/2PACX-1vT64A3AbrmT4TK8fLj5ctUc3LLMESXVTOuw3nBd2qRTEFIljaxTBW3-Z5u4w7W2Ng/pub?gid=1781390946&single=true&output=csv",
+    "Sojol Utara": "https://docs.google.com/spreadsheets/d/e/2PACX-1vT41KwECicPb2EY8d8BP1f73RM3dhVWYDOxpaFlHZluKFy9owLzyVX7N7mIUm37Tw/pub?gid=502544387&single=true&output=csv"
+};
+
+// ====== Rekap Table + Chart ======
+const tbody = document.querySelector("#rekapTable tbody");
+const kecLabels=[], totalNilai=[];
+let totalGlobal={ditemukan:0, tidak:0, baik:0, rr:0, rb:0, nilai:0};
+
+for (const [kec,data] of Object.entries(dataKecamatan)) {
+  const ditemukan=data.filter(d=>d.konfirmasi==="Ditemukan").length;
+  const tidak=data.filter(d=>d.konfirmasi!=="Ditemukan").length;
+  const baik=data.filter(d=>d.kondisi==="Baik").length;
+  const rr=data.filter(d=>d.kondisi==="Rusak Ringan").length;
+  const rb=data.filter(d=>d.kondisi==="Rusak Berat").length;
+  const nilai=data.reduce((a,b)=>a+b.nilai,0);
+
+  const tr=document.createElement("tr");
+  tr.innerHTML=`<td>${kec}</td><td>${ditemukan}</td><td>${tidak}</td>
+                <td>${baik}</td><td>${rr}</td><td>${rb}</td><td>${nilai.toFixed(2)}</td>`;
+  tbody.appendChild(tr);
+
+  kecLabels.push(kec); totalNilai.push(nilai);
+  totalGlobal.ditemukan+=ditemukan; totalGlobal.tidak+=tidak;
+  totalGlobal.baik+=baik; totalGlobal.rr+=rr; totalGlobal.rb+=rb; totalGlobal.nilai+=nilai;
+}
+// add total row to summary table
+const trTotal=document.createElement("tr");
+trTotal.classList.add("total");
+trTotal.innerHTML=`<td>TOTAL</td><td>${totalGlobal.ditemukan}</td><td>${totalGlobal.tidak}</td>
+                   <td>${totalGlobal.baik}</td><td>${totalGlobal.rr}</td><td>${totalGlobal.rb}</td>
+                   <td>${totalGlobal.nilai.toFixed(2)}</td>`;
+tbody.appendChild(trTotal);
+
+// Chart batang (Nilai per kecamatan)
+const chartRef=document.getElementById("rekapChart");
+const globalChart=new Chart(chartRef, {
+  type:'bar',
+  data:{ labels:kecLabels, datasets:[{ label:"Nilai Perolehan", data:totalNilai, backgroundColor:"#0074D9" }] },
+  options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } }, 
+            scales:{ y:{ beginAtZero:true } } }
+});
+
+// Chart pie (Kondisi global)
+const pieRef=document.getElementById("pieChart");
+const pieChart=new Chart(pieRef, {
+  type:'pie',
+  data:{
+    labels:["Baik","Rusak Ringan","Rusak Berat"],
+    datasets:[{
+      data:[totalGlobal.baik,totalGlobal.rr,totalGlobal.rb],
+      backgroundColor:["#2ECC40","#FFDC00","#FF4136"]
+    }]
+  },
+  options:{ responsive:true, maintainAspectRatio:false }
+});
+
+// ====== Download PDF ======
+document.getElementById("downloadPDF").addEventListener("click", async ()=>{
+  const { jsPDF }=window.jspdf;
+  const doc=new jsPDF(); const periode="Tahun 2025";
+
+  // ===== Summary page =====
+  doc.setFontSize(12);
+  doc.text("DINAS PENDIDIKAN DAN KEBUDAYAAN",14,10);
+  doc.text("KABUPATEN DONGGALA",14,16);
+  doc.text("Jl. Jati, Kel. Gunung Bale",14,22);
+  doc.text("REKAPITULASI INVENTARIS KIB B (Summary)",14,30);
+  doc.text(`Periode: ${periode}`,14,36);
+
+  // table summary
+  let body=[];
+  for (const kec of kecLabels){
+    const data=dataKecamatan[kec];
+    const ditemukan=data.filter(d=>d.konfirmasi==="Ditemukan").length;
+    const tidak=data.filter(d=>d.konfirmasi!=="Ditemukan").length;
+    const baik=data.filter(d=>d.kondisi==="Baik").length;
+    const rr=data.filter(d=>d.kondisi==="Rusak Ringan").length;
+    const rb=data.filter(d=>d.kondisi==="Rusak Berat").length;
+    const nilai=data.reduce((a,b)=>a+b.nilai,0);
+    body.push([kec,ditemukan,tidak,baik,rr,rb,nilai.toFixed(2)]);
+  }
+  body.push(["TOTAL",totalGlobal.ditemukan,totalGlobal.tidak,totalGlobal.baik,totalGlobal.rr,totalGlobal.rb,totalGlobal.nilai.toFixed(2)]);
+  doc.autoTable({startY:44, head:[["Kecamatan","Ditemukan","Tdk Ditemukan","Baik","Rusak R","Rusak B","Nilai"]],
+    body, theme:'grid', styles:{fontSize:7},
+    didParseCell:(data)=>{
+      if(data.row.raw[0]==="TOTAL"){ data.cell.styles.fillColor=[255,255,0]; data.cell.styles.fontStyle="bold"; }
+    }});
+
+  // export charts sejajar
+  const chartImg=globalChart.toBase64Image();
+  const pieImg=pieChart.toBase64Image();
+  const yCharts=doc.lastAutoTable.finalY+6;
+  doc.addImage(chartImg,"PNG",20,yCharts,80,60);   // kiri
+  doc.addImage(pieImg,"PNG",115,yCharts,80,60);    // kanan
+
+  // footer tanda tangan
+  const h=doc.internal.pageSize.height;
+  doc.text("A.n Kepala Dinas Pendidikan dan Kebudayaan",140,h-30);
+  doc.text("IRAWAN PANGIDEN, S.IP., M.Si",140,h-18);
+  doc.text("NIP. 19750331 199403 1 003",140,h-6);
+
+  // ===== Detail per kecamatan =====
+  for (const [kec,data] of Object.entries(dataKecamatan)) {
+    doc.addPage();
+    doc.setFontSize(12);
+    doc.text("DINAS PENDIDIKAN DAN KEBUDAYAAN",14,10);
+    doc.text("KABUPATEN DONGGALA",14,16);
+    doc.text("Jl. Jati, Kel. Gunung Bale",14,22);
+    doc.text(`Rekapitulasi KIB B - Kecamatan ${kec}`,14,30);
+    doc.text(`Periode: ${periode}`,14,36);
+    let startY=44;
+    const sekolahMap={};
+    data.forEach(r=>{
+      if(!sekolahMap[r.sekolah]) sekolahMap[r.sekolah]={barang:0,nilai:0,detail:[]};
+      sekolahMap[r.sekolah].barang++; sekolahMap[r.sekolah].nilai+=r.nilai; sekolahMap[r.sekolah].detail.push(r);
+    });
+    let total={barang:0,ditemukan:0,tidak:0,baik:0,rr:0,rb:0,nilai:0};
+    let body=[];
+    for (const [sName,val] of Object.entries(sekolahMap)) {
+      let ditemukan=val.detail.filter(d=>d.konfirmasi==="Ditemukan").length;
+      let tidak=val.detail.filter(d=>d.konfirmasi!=="Ditemukan").length;
+      let baik=val.detail.filter(d=>d.kondisi==="Baik").length;
+      let rr=val.detail.filter(d=>d.kondisi==="Rusak Ringan").length;
+      let rb=val.detail.filter(d=>d.kondisi==="Rusak Berat").length;
+      body.push([sName,val.barang,ditemukan,tidak,baik,rr,rb,val.nilai.toFixed(2)]);
+      total.barang+=val.barang; total.ditemukan+=ditemukan; total.tidak+=tidak;
+      total.baik+=baik; total.rr+=rr; total.rb+=rb; total.nilai+=val.nilai;
+    }
+    body.push(["TOTAL",total.barang,total.ditemukan,total.tidak,total.baik,total.rr,total.rb,total.nilai.toFixed(2)]);
+    doc.autoTable({startY, head:[["Sekolah","Jml","Ditemukan","Tdk Ditemukan","Baik","Rusak R","Rusak B","Nilai"]],
+      body, theme:'grid', styles:{fontSize:7}, headStyles:{fillColor:[200,200,200]}, 
+      didParseCell: data=>{
+        if(data.row.raw[0]==="TOTAL"){ data.cell.styles.fillColor=[255,255,0]; data.cell.styles.fontStyle="bold"; }
+      }});
+    startY=doc.lastAutoTable.finalY+6;
+    for (const [sName,val] of Object.entries(sekolahMap)) {
+      doc.autoTable({startY, head:[["Barang","NIBAR","Konfirmasi","Kondisi","Nilai"]],
+        body: val.detail.map(d=>[d.barang,d.nibar,d.konfirmasi,d.kondisi,d.nilai.toFixed(2)]),
+        theme:'grid', styles:{fontSize:7}});
+      startY=doc.lastAutoTable.finalY+6;
+    }
+    const h2=doc.internal.pageSize.height;
+    doc.text("A.n Kepala Dinas Pendidikan dan Kebudayaan",140,h2-30);
+    doc.text("IRAWAN PANGIDEN, S.IP., M.Si",140,h2-18);
+    doc.text("NIP. 19750331 199403 1 003",140,h2-6);
+  }
+  doc.save("Rekap_KIBB_Lengkap.pdf");
+});
+</script>
+</body>
+</html>
