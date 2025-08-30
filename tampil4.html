@@ -8,10 +8,10 @@
     body { font-family: Arial, sans-serif; margin: 20px; background: #f9f9f9; }
     h1 { text-align: center; }
     .filters { text-align: center; margin-bottom: 20px; }
-    table { width: 100%; border-collapse: collapse; background: #fff; }
+    table { width: 100%; border-collapse: collapse; background: #fff; margin-bottom: 20px; }
     th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
     th { background: #eee; }
-    .summary { margin: 20px 0; background: #fff; padding: 10px; border: 1px solid #ccc; }
+    .summary, .grand-summary { margin: 20px 0; background: #fff; padding: 10px; border: 1px solid #ccc; }
   </style>
 </head>
 <body>
@@ -33,6 +33,8 @@
     </thead>
     <tbody></tbody>
   </table>
+
+  <div class="grand-summary" id="grandSummary"></div>
 
 <script>
   const kecamatanEndpoints = {
@@ -85,15 +87,19 @@
   async function loadAllData(){
     for(const [kec,url] of Object.entries(kecamatanEndpoints)){
       const rawData = await fetchData(url);
-      dataKecamatan[kec] = rawData.map(r=>({
-        sekolah: r["Pengguna Barang"] || r["Nama Sekolah"] || "",
-        barang: r["Nama Barang"] || "",
-        nibar: r["NIBAR"] || r["No. Register"] || "",
-        konfirmasi: r["Konfirmasi Keberadaan"] || "Tidak Ditemukan",
-        kondisi: r["Kondisi"] || "Baik",
-        kondisiSaatIni: r["Kondisi Saat Ini"] || "",
-        nilai: parseNumber(r["Harga Perolehan"] || r["Nilai Perolehan"])
-      }));
+      dataKecamatan[kec] = rawData.map(r=>{
+        let sekolah = r["Pengguna Barang"] || r["Nama Sekolah"] || "";
+        // 🚫 Buang baris sampah yang tidak relevan
+        if (sekolah.includes("Penggunaan") || sekolah.includes("Status Pegawai") || sekolah.includes("Keterangan")) {
+          return null;
+        }
+        return {
+          sekolah,
+          barang: r["Nama Barang"] || "",
+          nibar: r["NIBAR"] || r["No. Register"] || "",
+          nilai: parseNumber(r["Harga Perolehan"] || r["Nilai Perolehan"])
+        };
+      }).filter(x=>x!==null);
     }
     populateFilter();
     updateData();
@@ -144,6 +150,24 @@
       `;
       tableBody.appendChild(tr);
     }
+
+    updateGrandSummary();
+  }
+
+  function updateGrandSummary(){
+    let totalBarangAll = 0;
+    let totalNilaiAll = 0;
+
+    for (const data of Object.values(dataKecamatan)) {
+      totalBarangAll += data.length;
+      totalNilaiAll += data.reduce((a,b)=>a+b.nilai,0);
+    }
+
+    document.getElementById("grandSummary").innerHTML = `
+      <h3>Rekap Total Semua Kecamatan</h3>
+      <strong>Total Barang:</strong> ${totalBarangAll}<br>
+      <strong>Total Nilai Perolehan:</strong> ${formatRupiah(totalNilaiAll)}
+    `;
   }
 
   loadAllData();
