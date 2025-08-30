@@ -12,6 +12,24 @@
     .expand-btn {cursor:pointer; border:none; background:none;}
     .chart-container {width:45%; display:inline-block; vertical-align:top; margin-bottom:20px;}
     .chart-full {width:95%; margin:20px auto;}
+    /* Ringkasan tabel responsif */
+    .ringkasan table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0;
+      font-size: 0.9rem;
+    }
+    .ringkasan th, .ringkasan td {
+      border: 1px solid #ddd;
+      padding: 6px;
+      text-align: center;
+    }
+    .ringkasan th {
+      background: #f7f7f7;
+    }
+    .ringkasan {
+      overflow-x: auto; /* supaya bisa discroll di HP */
+    }
   </style>
 </head>
 <body>
@@ -130,7 +148,7 @@
     function cleanSekolahName(name){
       if(!name) return "";
       return name
-        .replace(/➕.*$/,"") // hapus tambahan setelah simbol ➕
+        .replace(/➕.*$/,"")
         .replace(/Penggunaan.*$/i,"")
         .replace(/Status Pegawai Pengguna.*$/i,"")
         .replace(/Keterangan Tambahan.*$/i,"")
@@ -221,15 +239,15 @@
       document.getElementById("totalNilai").textContent=total.Nilai.toLocaleString("id-ID");
       document.getElementById("totalSekolah").textContent=total.Sekolah;
 
-      // update ringkasan jumlah sekolah per kecamatan (atas grafik)
-      let info = "<p><b>Total Jumlah Sekolah per Kecamatan:</b></p><ul>";
+      // update ringkasan jumlah sekolah per kecamatan (tabel kecil responsif)
+      let info = "<div class='ringkasan'><table><thead><tr><th>Kecamatan</th><th>Jumlah Sekolah</th></tr></thead><tbody>";
       for (const [kec, jml] of Object.entries(sekolahPerKecamatan)) {
-        info += `<li>${kec}: ${jml} sekolah</li>`;
+        info += `<tr><td>${kec}</td><td>${jml}</td></tr>`;
       }
-      info += `<li><b>Total Semua Kecamatan: ${total.Sekolah} sekolah</b></li></ul>`;
-      document.getElementById("totalSekolahPerKecamatan").innerHTML = info;
+      info += `<tr><th>Total Semua Kecamatan</th><th>${total.Sekolah}</th></tr>`;
+      info += "</tbody></table></div>";
 
-      // tampilkan juga di bawah tabel
+      document.getElementById("totalSekolahPerKecamatan").innerHTML = info;
       document.getElementById("ringkasanSekolahBawah").innerHTML = info;
 
       document.getElementById("lastUpdate").textContent="Data terakhir diperbarui: "+new Date().toLocaleTimeString();
