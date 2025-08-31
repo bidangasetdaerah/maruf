@@ -143,15 +143,26 @@ function parseNumberIndo(val){
     return parseFloat(val) || 0;
 }
 
-// ✅ Normalisasi kondisi barang
+// ✅ Normalisasi kondisi barang (lebih fleksibel)
 function normalizeKondisi(val){
     if(!val) return "baik";
     val = val.toString().toLowerCase().trim();
-    val = val.replace(/\s+/g," "); // hilangkan spasi ganda
-    if(val.includes("rusak berat")) return "rusak berat";
-    if(val.includes("rusak ringan")) return "rusak ringan";
-    if(val.includes("baik")) return "baik";
+    val = val.replace(/\s+/g," ");
+
+    // variasi Rusak Berat
+    if(val.includes("rusak berat") || val==="rb" || val==="r berat") 
+        return "rusak berat";
+
+    // variasi Rusak Ringan
+    if(val.includes("rusak ringan") || val==="rr" || val==="r ringan") 
+        return "rusak ringan";
+
+    // variasi Baik
+    if(val.includes("baik") || val==="b") 
+        return "baik";
+
     return "baik"; // fallback
+}
 }
 
 // Format Rupiah
