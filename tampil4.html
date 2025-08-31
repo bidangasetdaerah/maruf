@@ -12,6 +12,7 @@
     th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
     th { background: #eee; }
     .summary, .grand-summary { margin: 20px 0; background: #fff; padding: 10px; border: 1px solid #ccc; }
+    .print-footer { text-align: center; font-size: 12px; margin-top: 30px; color: #555; }
   </style>
 </head>
 <body>
@@ -19,6 +20,7 @@
   <div class="filters">
     <label for="kecamatan">Pilih Kecamatan:</label>
     <select id="kecamatan"></select>
+    <button onclick="printData()">Cetak</button>
   </div>
 
   <div class="summary" id="summary"></div>
@@ -55,15 +57,11 @@
     "Sojol": "https://docs.google.com/spreadsheets/d/e/2PACX-1vT64A3AbrmT4TK8fLj5ctUc3LLMESXVTOuw3nBd2qRTEFIljaxTBW3-Z5u4w7W2Ng/pub?gid=1781390946&single=true&output=csv",
     "Sojol Utara": "https://docs.google.com/spreadsheets/d/e/2PACX-1vT41KwECicPb2EY8d8BP1f73RM3dhVWYDOxpaFlHZluKFy9owLzyVX7N7mIUm37Tw/pub?gid=502544387&single=true&output=csv"
   };
-
   let dataKecamatan = {};
 
-  // Parsing angka (Rp)
   function parseNumber(str) {
     if (!str) return 0;
-    str = str.trim();
-    str = str.replace(/\./g, ""); // hapus titik ribuan
-    str = str.replace(/,/g, "."); // koma → desimal
+    str = str.trim().replace(/\./g, "").replace(/,/g, ".");
     let num = parseFloat(str);
     return isNaN(num) ? 0 : num;
   }
@@ -72,57 +70,14 @@
     return "Rp " + num.toLocaleString("id-ID");
   }
 
-  // Ambil kolom perolehan fleksibel
-  function getNilai(r) {
-    for (const key of Object.keys(r)) {
-      if (key.toLowerCase().includes("perolehan")) {
-        return parseNumber(r[key]);
-      }
-    }
-    return 0;
-  }
-
-  // Parser CSV aman (support tanda kutip)
-  function parseCSV(text) {
-    const rows = [];
-    let current = "", row = [], inQuotes = false;
-
-    for (let i = 0; i < text.length; i++) {
-      const c = text[i];
-
-      if (c === '"' && text[i+1] === '"') {
-        current += '"'; i++;
-      } else if (c === '"') {
-        inQuotes = !inQuotes;
-      } else if (c === ',' && !inQuotes) {
-        row.push(current.trim());
-        current = "";
-      } else if ((c === '\n' || c === '\r') && !inQuotes) {
-        if (current || row.length) {
-          row.push(current.trim());
-          rows.push(row);
-        }
-        row = [];
-        current = "";
-      } else {
-        current += c;
-      }
-    }
-    if (current || row.length) {
-      row.push(current.trim());
-      rows.push(row);
-    }
-    return rows;
-  }
-
   async function fetchData(url){
     const resp = await fetch(url);
     const text = await resp.text();
-    const rows = parseCSV(text);
+    const rows = text.split("\n").map(r=>r.split(","));
     const headers = rows[0];
     return rows.slice(1).map(r=>{
       let obj={};
-      headers.forEach((h,i)=>obj[h.trim()] = r[i] ? r[i].trim() : "");
+      headers.forEach((h,i)=>obj[h.trim()]=r[i]?r[i].trim():"");
       return obj;
     });
   }
@@ -139,13 +94,12 @@
           sekolah,
           barang: r["Nama Barang"] || "",
           nibar: r["NIBAR"] || r["No. Register"] || "",
-          nilai: getNilai(r)
+          nilai: parseNumber(r["Harga Perolehan"] || r["Nilai Perolehan"])
         };
       }).filter(x=>x!==null);
     }
     populateFilter();
     updateData();
-    setInterval(updateData,300000);
   }
 
   function populateFilter(){
@@ -175,7 +129,6 @@
       <strong>Total Nilai Perolehan:</strong> ${formatRupiah(totalNilai)}
     `;
 
-    // Rekap per sekolah
     let sekolahMap = {};
     data.forEach(d=>{
       if(!sekolahMap[d.sekolah]) sekolahMap[d.sekolah] = {jumlah:0, nilai:0};
@@ -199,17 +152,71 @@
   function updateGrandSummary(){
     let totalBarangAll = 0;
     let totalNilaiAll = 0;
-
     for (const data of Object.values(dataKecamatan)) {
       totalBarangAll += data.length;
       totalNilaiAll += data.reduce((a,b)=>a+b.nilai,0);
     }
-
     document.getElementById("grandSummary").innerHTML = `
       <h3>Rekap Total Semua Kecamatan</h3>
       <strong>Total Barang:</strong> ${totalBarangAll}<br>
       <strong>Total Nilai Perolehan:</strong> ${formatRupiah(totalNilaiAll)}
     `;
+  }
+
+  function printData(){
+    const kec = document.getElementById("kecamatan").value;
+    const tableHTML = document.getElementById("rekapTable").outerHTML;
+    const summaryHTML = document.getElementById("summary").outerHTML;
+    const grandSummaryHTML = document.getElementById("grandSummary").outerHTML;
+
+    const printWindow = window.open("", "_blank");
+    printWindow.document.write(`
+      <html>
+      <head>
+        <title>Laporan Rekap Aset</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 40px; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+          th, td { border: 1px solid #000; padding: 6px; text-align: left; }
+          th { background: #eee; }
+          h2,h3 { margin: 0; }
+          .print-footer { text-align: center; font-size: 12px; margin-top: 30px; color: #555; }
+        </style>
+      </head>
+      <body>
+        <div style="display:flex; align-items:center; border-bottom:2px solid #000; padding-bottom:10px; margin-bottom:20px;">
+          <div style="flex:0 0 80px; text-align:center;">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/e/e5/Lambang_Kabupaten_Donggala_%282015-sekarang%29.png" style="height:80px;">
+          </div>
+          <div style="flex:1; text-align:center;">
+            <h2>PEMERINTAH KABUPATEN DONGGALA</h2>
+            <h3>DINAS PENDIDIKAN DAN KEBUDAYAAN</h3>
+            <p>Jl. Jati No. 10, Kel.Gunung Bale Kec.Banawa Donggala - Sulawesi Tengah</p>
+          </div>
+        </div>
+
+        <h2 style="text-align:center; margin:20px 0;">LAPORAN REKAPITULASI DATA ASET</h2>
+        ${summaryHTML}
+        ${tableHTML}
+        ${grandSummaryHTML}
+
+        <div style="width:100%; text-align:right; margin-top:50px;">
+          <p>Donggala, .................. 2025</p>
+          <p><strong>Kepala Dinas Pendidikan dan Kebudayaan</strong></p>
+          <br>
+          <img src="https://i.ibb.co/6ZXD4zH/sample-ttd.png" alt="Tanda Tangan" style="height:80px;">
+          <br>
+          <p><strong>IRAWAN PANGIDEN, S.IP,. M.Si</strong><br>NIP. 19750331 199403 1 003</p>
+        </div>
+
+        <div class="print-footer">
+          Dicetak dari Sistem Inventaris Aset Dinas Pendidikan Donggala
+        </div>
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.print();
   }
 
   loadAllData();
