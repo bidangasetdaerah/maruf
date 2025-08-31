@@ -55,31 +55,74 @@
     "Sojol": "https://docs.google.com/spreadsheets/d/e/2PACX-1vT64A3AbrmT4TK8fLj5ctUc3LLMESXVTOuw3nBd2qRTEFIljaxTBW3-Z5u4w7W2Ng/pub?gid=1781390946&single=true&output=csv",
     "Sojol Utara": "https://docs.google.com/spreadsheets/d/e/2PACX-1vT41KwECicPb2EY8d8BP1f73RM3dhVWYDOxpaFlHZluKFy9owLzyVX7N7mIUm37Tw/pub?gid=502544387&single=true&output=csv"
   };
+
   let dataKecamatan = {};
 
-  // ✅ Perbaikan parsing angka
+  // Parsing angka (Rp)
   function parseNumber(str) {
     if (!str) return 0;
     str = str.trim();
-    str = str.replace(/\./g, "");   // hapus semua titik ribuan
-    str = str.replace(/,/g, ".");   // ganti koma jadi titik desimal
+    str = str.replace(/\./g, ""); // hapus titik ribuan
+    str = str.replace(/,/g, "."); // koma → desimal
     let num = parseFloat(str);
     return isNaN(num) ? 0 : num;
   }
 
-  // ✅ Format Rupiah
   function formatRupiah(num) {
     return "Rp " + num.toLocaleString("id-ID");
+  }
+
+  // Ambil kolom perolehan fleksibel
+  function getNilai(r) {
+    for (const key of Object.keys(r)) {
+      if (key.toLowerCase().includes("perolehan")) {
+        return parseNumber(r[key]);
+      }
+    }
+    return 0;
+  }
+
+  // Parser CSV aman (support tanda kutip)
+  function parseCSV(text) {
+    const rows = [];
+    let current = "", row = [], inQuotes = false;
+
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+
+      if (c === '"' && text[i+1] === '"') {
+        current += '"'; i++;
+      } else if (c === '"') {
+        inQuotes = !inQuotes;
+      } else if (c === ',' && !inQuotes) {
+        row.push(current.trim());
+        current = "";
+      } else if ((c === '\n' || c === '\r') && !inQuotes) {
+        if (current || row.length) {
+          row.push(current.trim());
+          rows.push(row);
+        }
+        row = [];
+        current = "";
+      } else {
+        current += c;
+      }
+    }
+    if (current || row.length) {
+      row.push(current.trim());
+      rows.push(row);
+    }
+    return rows;
   }
 
   async function fetchData(url){
     const resp = await fetch(url);
     const text = await resp.text();
-    const rows = text.split("\n").map(r=>r.split(","));
+    const rows = parseCSV(text);
     const headers = rows[0];
     return rows.slice(1).map(r=>{
       let obj={};
-      headers.forEach((h,i)=>obj[h.trim()]=r[i]?r[i].trim():"");
+      headers.forEach((h,i)=>obj[h.trim()] = r[i] ? r[i].trim() : "");
       return obj;
     });
   }
@@ -89,7 +132,6 @@
       const rawData = await fetchData(url);
       dataKecamatan[kec] = rawData.map(r=>{
         let sekolah = r["Pengguna Barang"] || r["Nama Sekolah"] || "";
-        // 🚫 Buang baris sampah yang tidak relevan
         if (sekolah.includes("Penggunaan") || sekolah.includes("Status Pegawai") || sekolah.includes("Keterangan")) {
           return null;
         }
@@ -97,7 +139,7 @@
           sekolah,
           barang: r["Nama Barang"] || "",
           nibar: r["NIBAR"] || r["No. Register"] || "",
-          nilai: parseNumber(r["Harga Perolehan"] || r["Nilai Perolehan"])
+          nilai: getNilai(r)
         };
       }).filter(x=>x!==null);
     }
