@@ -1,225 +1,196 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Rekap Data Aset</title>
-  <style>
-    body { font-family: Arial, sans-serif; margin: 20px; background: #f9f9f9; }
-    h1 { text-align: center; }
-    .filters { text-align: center; margin-bottom: 20px; }
-    table { width: 100%; border-collapse: collapse; background: #fff; margin-bottom: 20px; }
-    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-    th { background: #eee; }
-    .summary, .grand-summary { margin: 20px 0; background: #fff; padding: 10px; border: 1px solid #ccc; }
-    .print-footer { text-align: center; font-size: 12px; margin-top: 30px; color: #555; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rekap Data Aset Semua Kecamatan</title>
+<style>
+  body { font-family: Arial, sans-serif; margin: 20px; background: #f9f9f9; }
+  h1 { text-align: center; margin-bottom: 20px; }
+  .print-btn { display:block; margin:10px auto; padding:8px 16px; background:#4CAF50; color:#fff; border:none; border-radius:4px; cursor:pointer; }
+  .kecamatan { margin-bottom: 10px; border:1px solid #ccc; border-radius:5px; background:#fff; }
+  .kec-header { cursor: pointer; padding: 10px; background: #eee; font-weight: bold; display:flex; justify-content:space-between; align-items:center; }
+  .kec-content { display: block; padding: 10px; } /* Default terbuka */
+  table { width: 100%; border-collapse: collapse; margin-top:5px; }
+  th, td { border:1px solid #ccc; padding:5px; text-align:left; }
+  th { background:#ddd; }
+  .grand-summary { margin-top: 20px; padding: 10px; border:1px solid #ccc; background:#fff; }
+</style>
 </head>
 <body>
-  <h1>Rekap Data Aset Per Kecamatan</h1>
-  <div class="filters">
-    <label for="kecamatan">Pilih Kecamatan:</label>
-    <select id="kecamatan"></select>
-    <button onclick="printData()">Cetak</button>
-  </div>
+<h1>Rekap Data Aset Semua Kecamatan</h1>
+<button class="print-btn" onclick="printAll()">Cetak Semua Rekap</button>
 
-  <div class="summary" id="summary"></div>
-
-  <table id="rekapTable">
-    <thead>
-      <tr>
-        <th>Nama Sekolah</th>
-        <th>Jumlah Barang</th>
-        <th>Total Nilai Perolehan</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
-
-  <div class="grand-summary" id="grandSummary"></div>
+<div id="container"></div>
+<div class="grand-summary" id="grandSummary"></div>
 
 <script>
-  const kecamatanEndpoints = {
-    "Banawa": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRd8vIhHDUbmD6I2aXLX7-_Ysemt2aXA__wKNGoKN0XWWSWCScv5aSmx06H0xkl8g/pub?gid=1917777904&single=true&output=csv",
-    "Banawa Tengah": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRnykw5e_i3dwBIeTua-mpFExEJ4w6hROJ5F6OUHiiGpbtunldeKgXlhN_G-D1V8w/pub?gid=1454720232&single=true&output=csv",
-    "Banawa Selatan": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRhDJK33BtCz7KEi6DWgqheZBrcdgK0X9Pw1r28u5ec1MK-I-kP-QOqrsY0G2OnEQ/pub?gid=708970016&single=true&output=csv",
-    "Rio Pakava": "https://docs.google.com/spreadsheets/d/1_8YllqyTXGDZZCVeozFKAhGru2WS15Bp/export?format=csv",
-    "Pinembani": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQshgCYmG0DHxcwLUzhtUamXTYnWb8tR7WQwnJq9k7ldFz_JhV4GHDE-k_dMO_pSA/pub?gid=1860451546&single=true&output=csv",
-    "Tanantovea": "https://docs.google.com/spreadsheets/d/e/2PACX-1vR3MhjBMD3q8UIfOTdAUOHKMdeGcwr3y2YQGFcDmHDd0IVsOsAECl511LsNJ9ynow9cmY4yBpP1jENa/pub?gid=1200528899&single=true&output=csv",
-    "Labuan": "https://docs.google.com/spreadsheets/d/e/2PACX-1vT7WqNsmpUBIy0-lVm2JdGg1KUKwNgQPpbSyDuuFDwB1aGPY8gsZSBWmxIgiOeJNA/pub?gid=1615242439&single=true&output=csv",
-    "Sindue": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ2sjcmJjTCYD3p6-7pDQTmm3mCVphZIP2-5DGZOHxStucexMcdqPVsfsbnDouFcA/pub?gid=1920885371&single=true&output=csv",
-    "Sindue Tombusabora": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRYHOyrOQ_hNjC1L1FoIMVbbWES0dPGb1OaU6V--PV_lm0O97IHFvtPRhgRNXn_dA/pub?gid=1974330298&single=true&output=csv",
-    "Sindue Tobata": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQIbvzs-jZRcf1z0uV_Ahwh6dNdBgBHw66T358D9wd0-DHimDs8r4ajCvZwLa8Srg/pub?gid=801352666&single=true&output=csv",
-    "Sirenja": "https://docs.google.com/spreadsheets/d/e/2PACX-1vROhU6H6reNQxHKsAmYYgfcaSZyis1vALTmBkYhjAp7BGX_wNdA2cVdgOjFQIIgjQ/pub?output=csv",
-    "Balaesang": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQIf6mV6qgS6fmRe3jz305N8wCDdKWJcKKWSxHtybbo7xoERx15unD-x4rgyFxF-g/pub?gid=1401841928&single=true&output=csv",
-    "Balaesang Tanjung": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQRojLHXJ4W6IEdiNn34kZrMgr5QvPZllm85-sbgD0WxjG6vFMUMQz3QzzGnM-7pw/pub?gid=820099832&single=true&output=csv",
-    "Dampelas": "https://docs.google.com/spreadsheets/d/e/2PACX-1vR_BmCgfv-HOMRKzNMZ1aHL05CZsR7Ie0VZGRJTD29tX1C-ANiKASW1hB_PM69WuQ/pub?gid=1489077321&single=true&output=csv",
-    "Sojol": "https://docs.google.com/spreadsheets/d/e/2PACX-1vT64A3AbrmT4TK8fLj5ctUc3LLMESXVTOuw3nBd2qRTEFIljaxTBW3-Z5u4w7W2Ng/pub?gid=1781390946&single=true&output=csv",
-    "Sojol Utara": "https://docs.google.com/spreadsheets/d/e/2PACX-1vT41KwECicPb2EY8d8BP1f73RM3dhVWYDOxpaFlHZluKFy9owLzyVX7N7mIUm37Tw/pub?gid=502544387&single=true&output=csv"
-  };
-  let dataKecamatan = {};
+const kecamatanEndpoints = {
+  "Banawa": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRd8vIhHDUbmD6I2aXLX7-_Ysemt2aXA__wKNGoKN0XWWSWCScv5aSmx06H0xkl8g/pub?gid=1917777904&single=true&output=csv",
+  "Banawa Tengah": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRnykw5e_i3dwBIeTua-mpFExEJ4w6hROJ5F6OUHiiGpbtunldeKgXlhN_G-D1V8w/pub?gid=1454720232&single=true&output=csv",
+  "Banawa Selatan": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRhDJK33BtCz7KEi6DWgqheZBrcdgK0X9Pw1r28u5ec1MK-I-kP-QOqrsY0G2OnEQ/pub?gid=708970016&single=true&output=csv",
+  "Rio Pakava": "https://docs.google.com/spreadsheets/d/1_8YllqyTXGDZZCVeozFKAhGru2WS15Bp/export?format=csv",
+  "Pinembani": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQshgCYmG0DHxcwLUzhtUamXTYnWb8tR7WQwnJq9k7ldFz_JhV4GHDE-k_dMO_pSA/pub?gid=1860451546&single=true&output=csv",
+  "Tanantovea": "https://docs.google.com/spreadsheets/d/e/2PACX-1vR3MhjBMD3q8UIfOTdAUOHKMdeGcwr3y2YQGFcDmHDd0IVsOsAECl511LsNJ9ynow9cmY4yBpP1jENa/pub?gid=1200528899&single=true&output=csv",
+  "Labuan": "https://docs.google.com/spreadsheets/d/e/2PACX-1vT7WqNsmpUBIy0-lVm2JdGg1KUKwNgQPpbSyDuuFDwB1aGPY8gsZSBWmxIgiOeJNA/pub?gid=1615242439&single=true&output=csv",
+  "Sindue": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ2sjcmJjTCYD3p6-7pDQTmm3mCVphZIP2-5DGZOHxStucexMcdqPVsfsbnDouFcA/pub?gid=1920885371&single=true&output=csv",
+  "Sindue Tombusabora": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRYHOyrOQ_hNjC1L1FoIMVbbWES0dPGb1OaU6V--PV_lm0O97IHFvtPRhgRNXn_dA/pub?gid=1974330298&single=true&output=csv",
+  "Sindue Tobata": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQIbvzs-jZRcf1z0uV_Ahwh6dNdBgBHw66T358D9wd0-DHimDs8r4ajCvZwLa8Srg/pub?gid=801352666&single=true&output=csv",
+  "Sirenja": "https://docs.google.com/spreadsheets/d/e/2PACX-1vROhU6H6reNQxHKsAmYYgfcaSZyis1vALTmBkYhjAp7BGX_wNdA2cVdgOjFQIIgjQ/pub?output=csv",
+  "Balaesang": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQIf6mV6qgS6fmRe3jz305N8wCDdKWJcKKWSxHtybbo7xoERx15unD-x4rgyFxF-g/pub?gid=1401841928&single=true&output=csv",
+  "Balaesang Tanjung": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQRojLHXJ4W6IEdiNn34kZrMgr5QvPZllm85-sbgD0WxjG6vFMUMQz3QzzGnM-7pw/pub?gid=820099832&single=true&output=csv",
+  "Dampelas": "https://docs.google.com/spreadsheets/d/e/2PACX-1vR_BmCgfv-HOMRKzNMZ1aHL05CZsR7Ie0VZGRJTD29tX1C-ANiKASW1hB_PM69WuQ/pub?gid=1489077321&single=true&output=csv",
+  "Sojol": "https://docs.google.com/spreadsheets/d/e/2PACX-1vT64A3AbrmT4TK8fLj5ctUc3LLMESXVTOuw3nBd2qRTEFIljaxTBW3-Z5u4w7W2Ng/pub?gid=1781390946&single=true&output=csv",
+  "Sojol Utara": "https://docs.google.com/spreadsheets/d/e/2PACX-1vT41KwECicPb2EY8d8BP1f73RM3dhVWYDOxpaFlHZluKFy9owLzyVX7N7mIUm37Tw/pub?gid=502544387&single=true&output=csv"
+};
 
-  function parseNumber(str) {
-    if (!str) return 0;
-    str = str.trim().replace(/\./g, "").replace(/,/g, ".");
-    let num = parseFloat(str);
-    return isNaN(num) ? 0 : num;
+let dataKecamatan = {};
+
+function parseNumber(str) {
+  if(!str) return 0;
+  str = str.trim().replace(/\./g,"").replace(/,/g,".");
+  let num = parseFloat(str);
+  return isNaN(num)?0:num;
+}
+
+function formatRupiah(num){
+  return "Rp " + num.toLocaleString("id-ID");
+}
+
+async function fetchData(url){
+  const resp = await fetch(url);
+  const text = await resp.text();
+  const rows = text.split("\n").map(r=>r.split(","));
+  const headers = rows[0];
+  return rows.slice(1).map(r=>{
+    let obj={};
+    headers.forEach((h,i)=>obj[h.trim()]=r[i]?r[i].trim():"");
+    return obj;
+  });
+}
+
+function getNilaiPerolehan(row){
+  const possibleCols = ["Nilai Perolehan","Harga Perolehan","Harga","Nilai"];
+  for(const col of possibleCols){
+    if(row[col] && row[col].trim()!=="") return parseNumber(row[col]);
   }
+  return 0;
+}
 
-  function formatRupiah(num) {
-    return "Rp " + num.toLocaleString("id-ID");
+async function loadAllData(){
+  for(const [kec,url] of Object.entries(kecamatanEndpoints)){
+    const rawData = await fetchData(url);
+    dataKecamatan[kec] = rawData.map(r=>{
+      let sekolah = r["Pengguna Barang"] || r["Nama Sekolah"] || "";
+      if(sekolah.includes("Penggunaan") || sekolah.includes("Status Pegawai") || sekolah.includes("Keterangan")) return null;
+      return {
+        sekolah,
+        barang: r["Nama Barang"]||"",
+        nibar: r["NIBAR"]||r["No. Register"]||"",
+        nilai: getNilaiPerolehan(r)
+      };
+    }).filter(x=>x!==null);
   }
+  renderAll();
+}
 
-  async function fetchData(url){
-    const resp = await fetch(url);
-    const text = await resp.text();
-    const rows = text.split("\n").map(r=>r.split(","));
-    const headers = rows[0];
-    return rows.slice(1).map(r=>{
-      let obj={};
-      headers.forEach((h,i)=>obj[h.trim()]=r[i]?r[i].trim():"");
-      return obj;
-    });
-  }
+function renderAll(){
+  const container = document.getElementById("container");
+  container.innerHTML="";
+  let totalBarangAll = 0;
+  let totalNilaiAll = 0;
 
-  async function loadAllData(){
-    for(const [kec,url] of Object.entries(kecamatanEndpoints)){
-      const rawData = await fetchData(url);
-      dataKecamatan[kec] = rawData.map(r=>{
-        let sekolah = r["Pengguna Barang"] || r["Nama Sekolah"] || "";
-        if (sekolah.includes("Penggunaan") || sekolah.includes("Status Pegawai") || sekolah.includes("Keterangan")) {
-          return null;
-        }
-        return {
-          sekolah,
-          barang: r["Nama Barang"] || "",
-          nibar: r["NIBAR"] || r["No. Register"] || "",
-          nilai: parseNumber(r["Harga Perolehan"] || r["Nilai Perolehan"])
-        };
-      }).filter(x=>x!==null);
-    }
-    populateFilter();
-    updateData();
-  }
-
-  function populateFilter(){
-    const sel = document.getElementById("kecamatan");
-    sel.innerHTML = "";
-    for(const k of Object.keys(kecamatanEndpoints)){
-      const opt = document.createElement("option");
-      opt.value = k; opt.textContent = k;
-      sel.appendChild(opt);
-    }
-    sel.addEventListener("change", updateData);
-  }
-
-  function updateData(){
-    const kec = document.getElementById("kecamatan").value;
-    const data = dataKecamatan[kec] || [];
-    const summaryDiv = document.getElementById("summary");
-    const tableBody = document.querySelector("#rekapTable tbody");
-    tableBody.innerHTML = "";
-
-    let totalBarang = data.length;
-    let totalNilai = data.reduce((a,b)=>a+b.nilai,0);
-
-    summaryDiv.innerHTML = `
-      <strong>Kecamatan:</strong> ${kec}<br>
-      <strong>Jumlah Barang:</strong> ${totalBarang}<br>
-      <strong>Total Nilai Perolehan:</strong> ${formatRupiah(totalNilai)}
-    `;
+  for(const [kec, data] of Object.entries(dataKecamatan)){
+    totalBarangAll += data.length;
+    totalNilaiAll += data.reduce((a,b)=>a+b.nilai,0);
 
     let sekolahMap = {};
     data.forEach(d=>{
-      if(!sekolahMap[d.sekolah]) sekolahMap[d.sekolah] = {jumlah:0, nilai:0};
+      if(!sekolahMap[d.sekolah]) sekolahMap[d.sekolah]={jumlah:0,nilai:0};
       sekolahMap[d.sekolah].jumlah++;
       sekolahMap[d.sekolah].nilai += d.nilai;
     });
 
+    const kecDiv = document.createElement("div");
+    kecDiv.className="kecamatan";
+
+    const header = document.createElement("div");
+    header.className="kec-header";
+    header.innerHTML = `<span>${kec} (Barang: ${data.length}, Total: ${formatRupiah(data.reduce((a,b)=>a+b.nilai,0))})</span><span>▼</span>`;
+    header.onclick = ()=>{
+      const content = header.nextElementSibling;
+      content.style.display = content.style.display==="none"?"block":"none";
+    };
+    kecDiv.appendChild(header);
+
+    const content = document.createElement("div");
+    content.className="kec-content";
+
+    let table = `<table><thead><tr><th>Sekolah</th><th>Jumlah Barang</th><th>Total Nilai</th></tr></thead><tbody>`;
     for(const [sekolah, val] of Object.entries(sekolahMap)){
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${sekolah}</td>
-        <td>${val.jumlah}</td>
-        <td>${formatRupiah(val.nilai)}</td>
-      `;
-      tableBody.appendChild(tr);
+      table += `<tr><td>${sekolah}</td><td>${val.jumlah}</td><td>${formatRupiah(val.nilai)}</td></tr>`;
     }
+    table += `</tbody></table>`;
+    content.innerHTML = table;
+    kecDiv.appendChild(content);
 
-    updateGrandSummary();
+    container.appendChild(kecDiv);
   }
 
-  function updateGrandSummary(){
-    let totalBarangAll = 0;
-    let totalNilaiAll = 0;
-    for (const data of Object.values(dataKecamatan)) {
-      totalBarangAll += data.length;
-      totalNilaiAll += data.reduce((a,b)=>a+b.nilai,0);
-    }
-    document.getElementById("grandSummary").innerHTML = `
-      <h3>Rekap Total Semua Kecamatan</h3>
-      <strong>Total Barang:</strong> ${totalBarangAll}<br>
-      <strong>Total Nilai Perolehan:</strong> ${formatRupiah(totalNilaiAll)}
-    `;
-  }
+  document.getElementById("grandSummary").innerHTML = `
+    <h3>Rekap Total Semua Kecamatan</h3>
+    <strong>Total Barang:</strong> ${totalBarangAll}<br>
+    <strong>Total Nilai Perolehan:</strong> ${formatRupiah(totalNilaiAll)}
+  `;
+}
 
-  function printData(){
-    const kec = document.getElementById("kecamatan").value;
-    const tableHTML = document.getElementById("rekapTable").outerHTML;
-    const summaryHTML = document.getElementById("summary").outerHTML;
-    const grandSummaryHTML = document.getElementById("grandSummary").outerHTML;
+function printAll(){
+  const containerHTML = document.getElementById("container").innerHTML;
+  const grandHTML = document.getElementById("grandSummary").outerHTML;
 
-    const printWindow = window.open("", "_blank");
-    printWindow.document.write(`
-      <html>
-      <head>
-        <title>Laporan Rekap Aset</title>
-        <style>
-          body { font-family: Arial, sans-serif; margin: 40px; }
-          table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-          th, td { border: 1px solid #000; padding: 6px; text-align: left; }
-          th { background: #eee; }
-          h2,h3 { margin: 0; }
-          .print-footer { text-align: center; font-size: 12px; margin-top: 30px; color: #555; }
-        </style>
-      </head>
-      <body>
-        <div style="display:flex; align-items:center; border-bottom:2px solid #000; padding-bottom:10px; margin-bottom:20px;">
-          <div style="flex:0 0 80px; text-align:center;">
-            <img src="https://upload.wikimedia.org/wikipedia/commons/e/e5/Lambang_Kabupaten_Donggala_%282015-sekarang%29.png" style="height:80px;">
-          </div>
-          <div style="flex:1; text-align:center;">
-            <h2>PEMERINTAH KABUPATEN DONGGALA</h2>
-            <h3>DINAS PENDIDIKAN DAN KEBUDAYAAN</h3>
-            <p>Jl. Jati No. 10, Kel.Gunung Bale Kec.Banawa Donggala - Sulawesi Tengah</p>
-          </div>
-        </div>
+  // Tanggal otomatis
+  const tanggal = new Date();
+  const options = { day: '2-digit', month: 'long', year: 'numeric' };
+  const tanggalStr = tanggal.toLocaleDateString('id-ID', options);
 
-        <h2 style="text-align:center; margin:20px 0;">LAPORAN REKAPITULASI DATA ASET</h2>
-        ${summaryHTML}
-        ${tableHTML}
-        ${grandSummaryHTML}
+  const printWindow = window.open("", "_blank");
+  printWindow.document.write(`
+    <html><head><title>Cetak Rekap Semua Kecamatan</title>
+    <style>
+      body { font-family: Arial; margin:20px; }
+      table { border-collapse: collapse; width:100%; margin-bottom:10px; }
+      th, td { border:1px solid #000; padding:5px; }
+      th { background:#ddd; }
+      h2,h3 { margin:5px 0; text-align:center; }
+      .signature { margin-top:50px; text-align:right; }
+      .logo { text-align:center; margin-bottom:20px; }
+    </style>
+    </head>
+    <body>
+      <div class="logo">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/e/e5/Lambang_Kabupaten_Donggala_%282015-sekarang%29.png" style="height:80px;">
+        <h2>PEMERINTAH KABUPATEN DONGGALA</h2>
+        <h3>DINAS PENDIDIKAN DAN KEBUDAYAAN</h3>
+        <p>Jl. Jati No.10,Kelurahan Gunung Bale, Kecamatan Banawa - Donggala - Sulawesi Tengah</p>
+      </div>
+      <h2>LAPORAN REKAPITULASI DATA ASET</h2>
+      ${containerHTML}
+      ${grandHTML}
+      <div class="signature">
+        <p>Donggala, ${tanggalStr}</p>
+        <p><strong>Kepala Dinas Pendidikan dan Kebudayaan</strong></p>
+        <br>
+        <img src="" alt="Tanda Tangan" style="height:80px;">
+        <br>
+        <p><strong>IRAWAN PANGIDEN, S.IP,. M.Si</strong><br>NIP. 19750331 199403 1 003</p>
+      </div>
+    </body></html>
+  `);
+  printWindow.document.close();
+  printWindow.print();
+}
 
-        <div style="width:100%; text-align:right; margin-top:50px;">
-          <p>Donggala, .................. 2025</p>
-          <p><strong>Kepala Dinas Pendidikan dan Kebudayaan</strong></p>
-          <br>
-          <img src="https://i.ibb.co/6ZXD4zH/sample-ttd.png" alt="Tanda Tangan" style="height:80px;">
-          <br>
-          <p><strong>IRAWAN PANGIDEN, S.IP,. M.Si</strong><br>NIP. 19750331 199403 1 003</p>
-        </div>
-
-        <div class="print-footer">
-          Dicetak dari Sistem Inventaris Aset Dinas Pendidikan Donggala
-        </div>
-      </body>
-      </html>
-    `);
-    printWindow.document.close();
-    printWindow.print();
-  }
-
-  loadAllData();
+loadAllData();
 </script>
 </body>
 </html>
