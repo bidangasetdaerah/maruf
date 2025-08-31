@@ -123,23 +123,40 @@ const kecamatanEndpoints = {
 let dataKecamatan = {};
 let chartKonfirmasi, chartKondisi, chartNilai;
 
-// ✅ Parsing angka format Indonesia/US
+// ✅ Parsing angka format Indonesia / US lebih aman
 function parseNumberIndo(val){
     if(!val) return 0;
-    val = val.toString().trim().replace(/Rp/gi,'').replace(/\s/g,'');
 
+    // Bersihkan simbol & spasi
+    val = val.toString().trim()
+        .replace(/Rp/gi,'')
+        .replace(/\s/g,'');
+
+    // Jika ada titik & koma → cek mana desimal
     if (val.includes('.') && val.includes(',')) {
-        // Contoh: "37.710,50"
-        val = val.replace(/\./g,'').replace(',','.');
-    } else if (/^\d{1,3}(,\d{3})+$/.test(val)) {
+        // Contoh: "37.710,50" (Indonesia) → hapus titik, koma jadi desimal
+        if (val.lastIndexOf(',') > val.lastIndexOf('.')) {
+            val = val.replace(/\./g,'').replace(',','.');
+        }
+        // Contoh: "37,710.50" (US) → hapus koma, titik jadi desimal
+        else {
+            val = val.replace(/,/g,'');
+        }
+    }
+    // Kalau hanya ada koma → anggap ribuan
+    else if (val.includes(',') && !val.includes('.')) {
         // Contoh: "37,710,000"
         val = val.replace(/,/g,'');
-    } else {
-        // Contoh: "37.710.000"
-        val = val.replace(/\./g,'').replace(',','.');
     }
+    // Kalau hanya ada titik → anggap ribuan
+    else if (val.includes('.') && !val.includes(',')) {
+        // Contoh: "37.710.000"
+        val = val.replace(/\./g,'');
+    }
+
     return parseFloat(val) || 0;
 }
+
 
 // Format Rupiah
 function formatRupiah(num){
