@@ -93,11 +93,13 @@ button.expand-btn { background:#001f3f;color:white;border:none;padding:3px 6px;b
 <footer><p>&copy; 2025 DINAS PENDIDIKAN DAN KEBUDAYAAN - Semua Hak Dilindungi.</p></footer>
 
 <script>
+// Dark mode toggle
 function toggleDarkMode(){
     document.body.classList.toggle('dark-mode');
     document.getElementById("darkIcon").textContent = document.body.classList.contains("dark-mode") ? "☀️" : "🌙";
 }
 
+// Endpoint CSV per kecamatan
 const kecamatanEndpoints = {
     "Banawa": "https://docs.google.com/spreadsheets/d/e/2PACX-1vSCAaRZ9atAiEb-BvMChP_3Wq6wtmUUlNiTWVtwzh7r9KX5sRRZpq5WppSrSebym8z6-qI3zfWQOTNu/pub?gid=0&single=true&output=csv",
     "Banawa Tengah": "https://docs.google.com/spreadsheets/d/e/2PACX-1vToEAn2MqanfOGSKsDsV0cfGeXt6jJhf7DPEzgFeBl8GQkrbzd4iFuM3tRwyo_wV6m9PlxjQ-9Z0QhC/pub?gid=0&single=true&output=csv",
@@ -120,6 +122,7 @@ const kecamatanEndpoints = {
 let dataKecamatan = {};
 let chartKonfirmasi, chartKondisi, chartNilai;
 
+// Parse angka Indonesia
 function parseNumberIndo(val){
     if(!val) return 0;
     val = val.toString().replace(/\s/g,'').replace(/Rp/g,'');
@@ -134,12 +137,14 @@ function parseNumberIndo(val){
     return parseFloat(val) || 0;
 }
 
+// Fetch CSV
 async function fetchData(url){
     return new Promise(resolve => {
         Papa.parse(url, {download:true, header:true, complete: res => resolve(res.data)});
     });
 }
 
+// Load semua data
 async function loadAllData(){
     for(const [kec,url] of Object.entries(kecamatanEndpoints)){
         const rawData = await fetchData(url);
@@ -157,6 +162,7 @@ async function loadAllData(){
     setInterval(updateData, 300000);
 }
 
+// Populate filter kecamatan
 function populateFilter(){
     const filter = document.getElementById("filterKecamatan");
     Object.keys(dataKecamatan).forEach(k => {
@@ -166,6 +172,7 @@ function populateFilter(){
     document.getElementById("searchBox").addEventListener("input", updateData);
 }
 
+// Update tabel dan chart
 function updateData(){
     const filter = document.getElementById("filterKecamatan").value;
     const search = document.getElementById("searchBox").value.toLowerCase();
@@ -226,18 +233,47 @@ function updateData(){
     updateCharts(total);
 }
 
+// Update chart
 function updateCharts(total){
     const ctx1 = document.getElementById("rekapKonfirmasi").getContext("2d");
     const ctx2 = document.getElementById("rekapKondisi").getContext("2d");
     const ctx3 = document.getElementById("rekapNilai").getContext("2d");
+
     if(chartKonfirmasi) chartKonfirmasi.destroy();
     if(chartKondisi) chartKondisi.destroy();
     if(chartNilai) chartNilai.destroy();
-    chartKonfirmasi = new Chart(ctx1, {type:"pie", data:{labels:["Ditemukan","Tidak Ditemukan"], datasets:[{data:[total.Ditemukan,total.Tidak]}]}});
-    chartKondisi = new Chart(ctx2, {type:"bar", data:{labels:["Baik","Rusak Ringan","Rusak Berat"], datasets:[{data:[total.Baik,total.Ringan,total.Berat]}]}});
-    chartNilai = new Chart(ctx3, {type:"doughnut", data:{labels:["Nilai Barang"], datasets:[{data:[total.Nilai]}]}});
+
+    chartKonfirmasi = new Chart(ctx1, {
+        type: "pie",
+        data: { labels:["Ditemukan","Tidak Ditemukan"], datasets:[{data:[total.Ditemukan,total.Tidak]}] },
+        options: { plugins: { tooltip: { callbacks: { label: context => `${context.label}: ${context.raw}` } } } }
+    });
+
+    chartKondisi = new Chart(ctx2, {
+        type: "bar",
+        data: { labels:["Baik","Rusak Ringan","Rusak Berat"], datasets:[{data:[total.Baik,total.Ringan,total.Berat]}] },
+        options: { plugins: { tooltip: { callbacks: { label: context => `${context.label}: ${context.raw}` } } } }
+    });
+
+    chartNilai = new Chart(ctx3, {
+        type: "doughnut",
+        data: { labels:["Nilai Barang"], datasets:[{data:[total.Nilai]}] },
+        options: { 
+            plugins: { 
+                tooltip: { 
+                    callbacks: { 
+                        label: context => {
+                            let value = context.raw;
+                            return `${context.label}: Rp ${value.toLocaleString("id-ID")}`;
+                        } 
+                    } 
+                } 
+            } 
+        }
+    });
 }
 
+// Toggle detail sekolah
 function toggleDetail(id){
     const row = document.getElementById(id);
     if(!row) return;
@@ -246,6 +282,7 @@ function toggleDetail(id){
     else{ row.style.display = "none"; btn.textContent = "➕"; }
 }
 
+// Start
 loadAllData();
 </script>
 
