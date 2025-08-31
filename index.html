@@ -154,11 +154,26 @@
     });
   }
 
-  function parseNumber(value) {
-    if (!value) return 0;
-    if (typeof value === "number") return value;
-    return parseFloat(value.toString().replace(/[^\d,-]/g, "").replace(",", ".") || 0);
+ function parseNumber(value) {
+  if (!value) return 0;
+  value = value.toString().trim();
+
+  // hapus "Rp" dan spasi
+  value = value.replace(/Rp/gi, "").replace(/\s/g, "");
+
+  // jika format ribuan pakai koma (37,710,000) → hapus semua koma
+  if (/^\d{1,3}(,\d{3})+$/.test(value)) {
+    value = value.replace(/,/g, "");
   }
+
+  // hapus titik pemisah ribuan
+  value = value.replace(/\./g, "");
+
+  // ubah koma desimal jadi titik
+  value = value.replace(/,/g, ".");
+
+  return parseFloat(value) || 0;
+}
 
   async function updateData() {
     const filter = document.getElementById("filterKecamatan").value;
