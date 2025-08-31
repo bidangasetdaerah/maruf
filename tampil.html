@@ -7,7 +7,6 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 <style>
-/* --- style sama persis dengan versi Anda --- */
 body { font-family:sans-serif; margin:0; background:#f9fafb; transition:0.3s; }
 header { position:fixed; top:0; left:0; right:0; background:#001f3f; color:white; padding:12px 15px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; z-index:1000; box-shadow:0 2px 6px rgba(0,0,0,0.2);}
 header h1 { margin:0; font-size:1.1rem; }
@@ -67,7 +66,7 @@ button.expand-btn { background:#001f3f;color:white;border:none;padding:3px 6px;b
 <div class="dashboard">
 <div class="chart-container"><h2>Rekap Konfirmasi Keberadaan</h2><canvas id="rekapKonfirmasi"></canvas></div>
 <div class="chart-container"><h2>Rekap Kondisi Barang</h2><canvas id="rekapKondisi"></canvas></div>
-<div class="chart-container"><h2>Rekap Nilai Perolehan per Kondisi</h2><canvas id="rekapNilai"></canvas></div>
+<div class="chart-container"><h2>Rekap Nilai Perolehan</h2><canvas id="rekapNilai"></canvas></div>
 </div>
 
 <h2 style="padding-left:10px;">Rekap Per Kecamatan</h2>
@@ -94,13 +93,14 @@ button.expand-btn { background:#001f3f;color:white;border:none;padding:3px 6px;b
 <footer><p>&copy; 2025 DINAS PENDIDIKAN DAN KEBUDAYAAN - Semua Hak Dilindungi.</p></footer>
 
 <script>
-// Dark mode toggle
+// Dark mode
 function toggleDarkMode(){
     document.body.classList.toggle('dark-mode');
-    document.getElementById("darkIcon").textContent = document.body.classList.contains("dark-mode") ? "☀️" : "🌙";
+    document.getElementById("darkIcon").textContent =
+      document.body.classList.contains("dark-mode") ? "☀️" : "🌙";
 }
 
-// --- Endpoint Google Sheets per kecamatan tetap sama seperti versi Anda ---
+// --- Endpoint Google Sheets per kecamatan ---
 const kecamatanEndpoints = {
   "Banawa": "https://docs.google.com/spreadsheets/d/e/2PACX-1vSCAaRZ9atAiEb-BvMChP_3Wq6wtmUUlNiTWVtwzh7r9KX5sRRZpq5WppSrSebym8z6-qI3zfWQOTNu/pub?gid=0&single=true&output=csv",
   "Banawa Tengah": "https://docs.google.com/spreadsheets/d/e/2PACX-1vToEAn2MqanfOGSKsDsV0cfGeXt6mJhf7DPEzgFeBl8GQkrbzd4iFuM3tRwyo_wV6m9PlxjQ-9Z0QhC/pub?gid=0&single=true&output=csv",
@@ -123,169 +123,169 @@ const kecamatanEndpoints = {
 let dataKecamatan = {};
 let chartKonfirmasi, chartKondisi, chartNilai;
 
-// ✅ Parsing angka Indonesia (normalisasi ke integer)
+// ✅ Parsing angka format Indonesia/US
 function parseNumberIndo(val){
     if(!val) return 0;
-    val = val.toString().trim();
-    val = val.replace(/Rp/gi,'').replace(/\s/g,''); // hapus Rp & spasi
+    val = val.toString().trim().replace(/Rp/gi,'').replace(/\s/g,'');
 
-    // Jika format ribuan pakai koma (37,710,000), hapus semua koma
-    if (/^\d{1,3}(,\d{3})+$/.test(val)) {
+    if (val.includes('.') && val.includes(',')) {
+        // Contoh: "37.710,50"
+        val = val.replace(/\./g,'').replace(',','.');
+    } else if (/^\d{1,3}(,\d{3})+$/.test(val)) {
+        // Contoh: "37,710,000"
         val = val.replace(/,/g,'');
+    } else {
+        // Contoh: "37.710.000"
+        val = val.replace(/\./g,'').replace(',','.');
     }
-
-    // Hapus titik pemisah ribuan
-    val = val.replace(/\./g,'');
-
-    // Jika ada koma desimal (misal "37,5"), ubah ke titik
-    val = val.replace(/,/g,'.');
-
     return parseFloat(val) || 0;
 }
 
-// Format jadi Rupiah
+// Format Rupiah
 function formatRupiah(num){
     return "Rp " + (num||0).toLocaleString("id-ID");
 }
 
-// --- Fetch CSV ---
+// Fetch CSV
 async function fetchData(url){
     return new Promise(resolve => {
-        Papa.parse(url, {download:true, header:true, complete: res => resolve(res.data)});
+        Papa.parse(url,{download:true,header:true,complete:res=>resolve(res.data)});
     });
 }
 
-// --- Load semua data ---
+// Load data
 async function loadAllData(){
     for(const [kec,url] of Object.entries(kecamatanEndpoints)){
-        const rawData = await fetchData(url);
-        dataKecamatan[kec] = rawData.map(r => ({
+        const raw = await fetchData(url);
+        dataKecamatan[kec] = raw.map(r=>({
             sekolah: r["Nama Sekolah"]||r["Pengguna Barang"]||"",
             barang: r["Nama Barang"]||"",
             nibar: r["NIBAR"]||r["No. Register"]||"",
-            konfirmasi: r["Konfirmasi Keberadaan"]||"Tidak Ditemukan",
-            kondisi: r["Kondisi"]||"Baik",
+            konfirmasi: (r["Konfirmasi Keberadaan"]||"Tidak Ditemukan").toLowerCase().trim(),
+            kondisi: (r["Kondisi"]||"Baik").toLowerCase().trim(),
             nilai: parseNumberIndo(r["Harga Perolehan"]||r["Nilai Perolehan"])
         }));
     }
     populateFilter();
     updateData();
-    setInterval(updateData, 300000);
+    setInterval(updateData,300000);
 }
 
-// --- Populate filter kecamatan ---
+// Populate filter
 function populateFilter(){
     const filter = document.getElementById("filterKecamatan");
-    Object.keys(dataKecamatan).forEach(k => {
-        const opt = document.createElement("option"); 
-        opt.value = k; 
-        opt.textContent = k; 
+    Object.keys(dataKecamatan).forEach(k=>{
+        const opt=document.createElement("option");
+        opt.value=k; opt.textContent=k;
         filter.appendChild(opt);
     });
-    filter.addEventListener("change", updateData);
-    document.getElementById("searchBox").addEventListener("input", updateData);
+    filter.addEventListener("change",updateData);
+    document.getElementById("searchBox").addEventListener("input",updateData);
 }
 
-// --- Update tabel dan chart ---
+// Update tabel + chart
 function updateData(){
     const filter = document.getElementById("filterKecamatan").value;
     const search = document.getElementById("searchBox").value.toLowerCase();
-    const tbody = document.querySelector("#rekapTable tbody");
-    tbody.innerHTML = "";
-    document.getElementById("sekolahSection").innerHTML = "";
-    let total = {Ditemukan:0, Tidak:0, Baik:0, Ringan:0, Berat:0, Nilai:0};
+    const tbody=document.querySelector("#rekapTable tbody");
+    tbody.innerHTML="";
+    document.getElementById("sekolahSection").innerHTML="";
 
-    for(const [kec, data] of Object.entries(dataKecamatan)){
-        if(filter !== "all" && filter !== kec) continue;
+    let total={Ditemukan:0,Tidak:0,Baik:0,Ringan:0,Berat:0,Nilai:0};
+
+    for(const [kec,data] of Object.entries(dataKecamatan)){
+        if(filter!=="all" && filter!==kec) continue;
         let ditemukan=0,tidak=0,baik=0,ringan=0,berat=0,nilai=0;
-        const sekolahMap = {};
+        const sekolahMap={};
+
         data.forEach(r=>{
             if(search && !r.sekolah.toLowerCase().includes(search)) return;
-            if(r.konfirmasi==="Ditemukan") ditemukan++; else tidak++;
-            if(r.kondisi==="Baik") baik++;
-            else if(r.kondisi==="Rusak Ringan") ringan++;
-            else if(r.kondisi==="Rusak Berat") berat++;
+            if(r.konfirmasi==="ditemukan") ditemukan++; else tidak++;
+            if(r.kondisi==="baik") baik++;
+            else if(r.kondisi==="rusak ringan") ringan++;
+            else if(r.kondisi==="rusak berat") berat++;
             nilai += r.nilai;
-            if(!sekolahMap[r.sekolah]) sekolahMap[r.sekolah] = {barang:0,nilai:0,detail:[]};
+
+            if(!sekolahMap[r.sekolah]) sekolahMap[r.sekolah]={barang:0,nilai:0,detail:[]};
             sekolahMap[r.sekolah].barang++;
-            sekolahMap[r.sekolah].nilai += r.nilai;
+            sekolahMap[r.sekolah].nilai+=r.nilai;
             sekolahMap[r.sekolah].detail.push(r);
         });
 
-        total.Ditemukan += ditemukan;
-        total.Tidak += tidak;
-        total.Baik += baik;
-        total.Ringan += ringan;
-        total.Berat += berat;
-        total.Nilai += nilai;
+        total.Ditemukan+=ditemukan;
+        total.Tidak+=tidak;
+        total.Baik+=baik;
+        total.Ringan+=ringan;
+        total.Berat+=berat;
+        total.Nilai+=nilai;
 
-        const tr = document.createElement("tr");
-        tr.innerHTML = `<td>${kec}</td><td>${ditemukan}</td><td>${tidak}</td><td>${baik}</td><td>${ringan}</td><td>${berat}</td><td>${formatRupiah(nilai)}</td>`;
+        const tr=document.createElement("tr");
+        tr.innerHTML=`<td>${kec}</td><td>${ditemukan}</td><td>${tidak}</td><td>${baik}</td><td>${ringan}</td><td>${berat}</td><td>${formatRupiah(nilai)}</td>`;
         tbody.appendChild(tr);
 
-        const section = document.getElementById("sekolahSection");
-        let html = `<h3>Daftar Sekolah - ${kec}</h3><table><thead><tr><th>Nama Sekolah</th><th>Jumlah Barang</th><th>Nilai Perolehan</th></tr></thead><tbody>`;
+        let html=`<h3>Daftar Sekolah - ${kec}</h3><table><thead><tr><th>Nama Sekolah</th><th>Jumlah Barang</th><th>Nilai Perolehan</th></tr></thead><tbody>`;
         let idx=0;
         for(const [sName,val] of Object.entries(sekolahMap)){
             idx++; const detailId=`detail_${kec}_${idx}`;
-            html += `<tr><td><button class="expand-btn" onclick="toggleDetail('${detailId}')">➕</button>${sName}</td><td>${val.barang}</td><td>${formatRupiah(val.nilai)}</td></tr>`;
-            html += `<tr id="${detailId}" style="display:none;"><td colspan="3"><table style="width:100%; border:1px solid #ddd; font-size:0.8rem;"><thead><tr><th>Nama Barang</th><th>NIBAR</th><th>Kondisi</th><th>Nilai Perolehan</th></tr></thead><tbody>`;
-            val.detail.forEach(it=>{html += `<tr><td>${it.barang}</td><td>${it.nibar}</td><td>${it.kondisi}</td><td>${formatRupiah(it.nilai)}</td></tr>`});
-            html += `</tbody></table></td></tr>`;
+            html+=`<tr><td><button class="expand-btn" onclick="toggleDetail('${detailId}')">➕</button>${sName}</td><td>${val.barang}</td><td>${formatRupiah(val.nilai)}</td></tr>`;
+            html+=`<tr id="${detailId}" style="display:none;"><td colspan="3"><table style="width:100%; border:1px solid #ddd; font-size:0.8rem;"><thead><tr><th>Nama Barang</th><th>NIBAR</th><th>Kondisi</th><th>Nilai</th></tr></thead><tbody>`;
+            val.detail.forEach(it=>{
+                html+=`<tr><td>${it.barang}</td><td>${it.nibar}</td><td>${it.kondisi}</td><td>${formatRupiah(it.nilai)}</td></tr>`;
+            });
+            html+=`</tbody></table></td></tr>`;
         }
-        html += `</tbody></table>`;
-        section.innerHTML += html;
+        html+=`</tbody></table>`;
+        document.getElementById("sekolahSection").innerHTML+=html;
     }
 
-    document.getElementById("totalDitemukan").textContent = total.Ditemukan;
-    document.getElementById("totalTidakDitemukan").textContent = total.Tidak;
-    document.getElementById("totalBaik").textContent = total.Baik;
-    document.getElementById("totalRusakRingan").textContent = total.Ringan;
-    document.getElementById("totalRusakBerat").textContent = total.Berat;
-    document.getElementById("totalNilai").textContent = formatRupiah(total.Nilai);
-    document.getElementById("lastUpdate").textContent = "Data terakhir diperbarui: " + new Date().toLocaleTimeString();
+    document.getElementById("totalDitemukan").textContent=total.Ditemukan;
+    document.getElementById("totalTidakDitemukan").textContent=total.Tidak;
+    document.getElementById("totalBaik").textContent=total.Baik;
+    document.getElementById("totalRusakRingan").textContent=total.Ringan;
+    document.getElementById("totalRusakBerat").textContent=total.Berat;
+    document.getElementById("totalNilai").textContent=formatRupiah(total.Nilai);
+    document.getElementById("lastUpdate").textContent="Data terakhir diperbarui: "+new Date().toLocaleTimeString();
+
     updateCharts(total);
 }
 
-// --- Update chart ---
+// Update chart
 function updateCharts(total){
-    const ctx1 = document.getElementById("rekapKonfirmasi").getContext("2d");
-    const ctx2 = document.getElementById("rekapKondisi").getContext("2d");
-    const ctx3 = document.getElementById("rekapNilai").getContext("2d");
-
+    const ctx1=document.getElementById("rekapKonfirmasi").getContext("2d");
+    const ctx2=document.getElementById("rekapKondisi").getContext("2d");
+    const ctx3=document.getElementById("rekapNilai").getContext("2d");
     if(chartKonfirmasi) chartKonfirmasi.destroy();
     if(chartKondisi) chartKondisi.destroy();
     if(chartNilai) chartNilai.destroy();
 
-    chartKonfirmasi = new Chart(ctx1, {
-        type: "pie",
-        data: { labels:["Ditemukan","Tidak Ditemukan"], datasets:[{data:[total.Ditemukan,total.Tidak]}] }
+    chartKonfirmasi=new Chart(ctx1,{
+        type:"pie",
+        data:{labels:["Ditemukan","Tidak Ditemukan"],datasets:[{data:[total.Ditemukan,total.Tidak],backgroundColor:["#10b981","#ef4444"]}]}
     });
 
-    chartKondisi = new Chart(ctx2, {
-        type: "bar",
-        data: { labels:["Baik","Rusak Ringan","Rusak Berat"], datasets:[{data:[total.Baik,total.Ringan,total.Berat]}] }
+    chartKondisi=new Chart(ctx2,{
+        type:"bar",
+        data:{labels:["Baik","Rusak Ringan","Rusak Berat"],datasets:[{data:[total.Baik,total.Ringan,total.Berat],backgroundColor:["#3b82f6","#facc15","#f87171"]}]}
     });
 
-    chartNilai = new Chart(ctx3, {
-        type: "doughnut",
-        data: { labels:["Total Nilai Barang"], datasets:[{data:[total.Nilai]}] },
-        options: { plugins: { tooltip: { callbacks: { label: ctx => formatRupiah(ctx.raw) } } } }
+    chartNilai=new Chart(ctx3,{
+        type:"doughnut",
+        data:{labels:["Total Nilai Barang"],datasets:[{data:[total.Nilai],backgroundColor:["#6366f1"]}]},
+        options:{plugins:{tooltip:{callbacks:{label:ctx=>formatRupiah(ctx.raw)}}}}
     });
 }
 
-// --- Toggle detail sekolah ---
+// Toggle detail sekolah
 function toggleDetail(id){
-    const row = document.getElementById(id);
+    const row=document.getElementById(id);
     if(!row) return;
-    const btn = row.previousElementSibling.querySelector("button");
-    if(row.style.display === "none"){ row.style.display = "table-row"; btn.textContent = "➖"; }
-    else{ row.style.display = "none"; btn.textContent = "➕"; }
+    const btn=row.previousElementSibling.querySelector("button");
+    if(row.style.display==="none"){row.style.display="table-row"; btn.textContent="➖";}
+    else{row.style.display="none"; btn.textContent="➕";}
 }
 
 // Start
 loadAllData();
 </script>
-
 </body>
 </html>
