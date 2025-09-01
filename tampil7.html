@@ -1,3 +1,104 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard KIB B - DINAS PENDIDIKAN DAN KEBUDAYAAN</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<style>
+body { font-family:sans-serif; margin:0; background:#f9fafb; transition:0.3s; }
+header { position:fixed; top:0; left:0; right:0; background:#001f3f; color:white; padding:12px 15px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; z-index:1000; box-shadow:0 2px 6px rgba(0,0,0,0.2);}
+header h1 { margin:0; font-size:1.1rem; }
+header nav a { color:white; text-decoration:none; margin-right:10px; font-size:0.9rem;}
+header nav a:hover { text-decoration:underline; }
+.dark-toggle { background:none;border:none;color:white;font-size:1.4rem;cursor:pointer;}
+main { padding-top:85px; min-height:80vh;}
+footer { background:#001f3f;color:#f3f4f6;text-align:center;padding:15px 10px;font-size:0.85rem;}
+h2 { font-size:1.2rem;margin-top:20px; }
+h3 { font-size:1rem;margin-top:15px;color:#1f2937; }
+.dashboard { display:flex; flex-wrap:wrap; gap:10px; margin-top:15px; padding:0 10px; }
+.chart-container, table { background:white; border-radius:8px; padding:10px; box-shadow:0 2px 6px rgba(0,0,0,0.1); width:100%; }
+.chart-container { flex:1 1 300px; }
+canvas { width:100% !important; height:250px !important; }
+table { width:100%; border-collapse:collapse; font-size:0.85rem; margin-top:10px; }
+th, td { border:1px solid #ddd; padding:6px; text-align:left; }
+th { background-color:#001f3f;color:white;font-size:0.8rem; }
+.last-update { font-size:0.8rem;color:#555;margin-top:5px; }
+.controls { margin:15px 10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+input, select { padding:5px; border:1px solid #ccc; border-radius:5px; cursor:pointer; }
+body.dark-mode { background:#111827; color:#f3f4f6; }
+body.dark-mode header, body.dark-mode footer { background:#0a192f; }
+body.dark-mode .chart-container, body.dark-mode table { background:#1f2937; color:#f3f4f6; }
+body.dark-mode th { background-color:#0a192f; }
+body.dark-mode td, body.dark-mode h3 { color:#f3f4f6; }
+body.dark-mode .last-update { color:#d1d5db; }
+button.expand-btn { background:#001f3f;color:white;border:none;padding:3px 6px;border-radius:4px;cursor:pointer;margin-right:5px; }
+</style>
+</head>
+<body>
+
+<header>
+<div style="display:flex; align-items:center; gap:8px;">
+<img src="https://upload.wikimedia.org/wikipedia/commons/e/e5/Lambang_Kabupaten_Donggala_%282015-sekarang%29.png" alt="Logo" style="height:32px;">
+<h1>Dashboard KIB B</h1>
+</div>
+<div style="display:flex; align-items:center; gap:10px;">
+<nav>
+<a href="#rekapTable">Rekap</a>
+<a href="#sekolahSection">Sekolah</a>
+<a href="#about">Tentang</a>
+</nav>
+<button class="dark-toggle" onclick="toggleDarkMode()"><span id="darkIcon">🌙</span></button>
+</div>
+</header>
+
+<main>
+<h2 style="text-align:center;">DINAS PENDIDIKAN DAN KEBUDAYAAN</h2>
+
+<div class="controls">
+  <label><b>Filter Kabupaten:</b></label>
+  <select id="filterKabupaten"><option value="all">Semua Kabupaten</option></select>
+  <label><b>Cari Sekolah:</b></label>
+  <input type="text" id="searchBox" placeholder="Ketik nama sekolah...">
+  <label><b>Filter Kondisi:</b></label>
+  <select id="filterKondisi">
+    <option value="all">Semua</option>
+    <option value="baik">Baik</option>
+    <option value="rusak ringan">Rusak Ringan</option>
+    <option value="rusak berat">Rusak Berat</option>
+  </select>
+</div>
+
+<div class="dashboard">
+<div class="chart-container"><h2>Rekap Konfirmasi Keberadaan</h2><canvas id="rekapKonfirmasi"></canvas></div>
+<div class="chart-container"><h2>Rekap Kondisi Barang</h2><canvas id="rekapKondisi"></canvas></div>
+<div class="chart-container"><h2>Rekap Nilai Perolehan</h2><canvas id="rekapNilai"></canvas></div>
+</div>
+
+<h2 style="padding-left:10px;">Rekap Per Kabupaten</h2>
+<div id="lastUpdate" class="last-update" style="padding-left:10px;">Memuat data...</div>
+<div style="padding: 0 10px;">
+<table id="rekapTable">
+<thead>
+<tr>
+<th>Kabupaten</th><th>Ditemukan</th><th>Tidak Ditemukan</th><th>Baik</th><th>Rusak Ringan</th><th>Rusak Berat</th><th>Nilai Perolehan</th>
+</tr>
+</thead>
+<tbody></tbody>
+<tfoot>
+<tr style="font-weight:bold; background:#e5e7eb; color:black;">
+<td>Total</td><td id="totalDitemukan">0</td><td id="totalTidakDitemukan">0</td><td id="totalBaik">0</td><td id="totalRusakRingan">0</td><td id="totalRusakBerat">0</td><td id="totalNilai">0</td>
+</tr>
+</tfoot>
+</table>
+</div>
+
+<div id="sekolahSection" style="padding:10px;"></div>
+</main>
+
+<footer><p>&copy; 2025 DINAS PENDIDIKAN DAN KEBUDAYAAN - Sub Keuangan dan Aset.</p></footer>
+
 <script>
 // === Dark Mode Toggle ===
 function toggleDarkMode(){
@@ -7,46 +108,31 @@ function toggleDarkMode(){
 }
 
 // === Utility ===
-function debounce(func, wait){ 
-    let timeout; 
-    return (...args)=>{ 
-        clearTimeout(timeout); 
-        timeout=setTimeout(()=>func(...args), wait); 
-    }; 
-}
+function debounce(func, wait){ let timeout; return (...args)=>{ clearTimeout(timeout); timeout=setTimeout(()=>func(...args), wait); }; }
 
 // === Parsing & Normalisasi ===
 function parseNumberIndo(val){
     if(!val) return 0;
-    val = val.toString().trim();
-    val = val.replace(/Rp/gi,'').replace(/\s/g,''); // hapus Rp dan spasi
-    val = val.replace(/\./g,''); // hapus titik ribuan
-    val = val.replace(/,/g,'.'); // ubah koma jadi desimal jika ada
+    val = val.toString().trim().replace(/Rp/gi,'').replace(/\s/g,'').replace(/\./g,'').replace(/,/g,'.');
     return parseFloat(val) || 0;
 }
-
 function normalizeKondisi(val){
     if(!val) return "baik";
-    val = val.toString().toLowerCase().trim().replace(/\s+/g," ");
+    val = val.toString().toLowerCase().trim();
     if(val.includes("rusak berat")||val==="rb"||val==="r berat") return "rusak berat";
     if(val.includes("rusak ringan")||val==="rr"||val==="r ringan") return "rusak ringan";
     if(val.includes("baik")||val==="b") return "baik";
     return "baik";
 }
+function formatRupiah(num){ return "Rp "+(num||0).toLocaleString("id-ID",{minimumFractionDigits:2,maximumFractionDigits:2}); }
 
-function formatRupiah(num){ return "Rp "+(num||0).toLocaleString("id-ID"); }
-
-// === Endpoint CSV Kabupaten ===
+// === Endpoint CSV ===
 const kabupatenEndpoints = {
   "Donggala": "https://docs.google.com/spreadsheets/d/e/2PACX-1vSebUxTRRPKz3bnjVy0GcfjwU3ouuZ67B8pMO7o56lMPZMrCscTqw3XbQ6UFjevabMYB_Ml_vVrfRln/pub?gid=982774577&single=true&output=csv",
 };
 
 // === Fetch CSV ===
-async function fetchData(url){ 
-    return new Promise(resolve=>{
-        Papa.parse(url,{download:true,header:true,complete:res=>resolve(res.data)});
-    }); 
-}
+async function fetchData(url){ return new Promise(resolve=>{ Papa.parse(url,{download:true,header:true,complete:res=>resolve(res.data)}); }); }
 
 // === Load Data ===
 let dataKabupaten = {}, chartKonfirmasi, chartKondisi, chartNilai;
@@ -56,12 +142,7 @@ async function loadAllData(){
         return [kab, raw.map(r=>{
             let sekolah = (r["Nama Sekolah"] || r["Pengguna Barang"] || "").trim();
             let nilai = parseNumberIndo(r["Harga Perolehan"] || r["Nilai Perolehan"]);
-
-            // VALIDASI KHUSUS SMPN 1 Sojol Utara
-            if(sekolah.toLowerCase() === "smpn 1 sojol utara"){
-                nilai = 783920915;
-            }
-
+            if(sekolah.toLowerCase()==="smpn 1 sojol utara") nilai = 783920915; // koreksi khusus
             return {
                 sekolah: sekolah,
                 barang: r["Nama Barang"] || "",
@@ -80,18 +161,13 @@ async function loadAllData(){
 // === Filter & Search ===
 function populateFilter(){
     const filter = document.getElementById("filterKabupaten");
-    Object.keys(dataKabupaten).forEach(k=>{
-        const opt=document.createElement("option"); 
-        opt.value=k; 
-        opt.textContent=k; 
-        filter.appendChild(opt); 
-    });
+    Object.keys(dataKabupaten).forEach(k=>{ const opt=document.createElement("option"); opt.value=k; opt.textContent=k; filter.appendChild(opt); });
     filter.addEventListener("change", debounce(updateData,300));
     document.getElementById("searchBox").addEventListener("input", debounce(updateData,300));
     document.getElementById("filterKondisi").addEventListener("change", debounce(updateData,300));
 }
 
-// === Update Data ===
+// === Update Data dengan Pivot Sekolah ===
 function updateData(){
     const filterKabupaten = document.getElementById("filterKabupaten").value;
     const filterKondisi = document.getElementById("filterKondisi").value;
@@ -102,13 +178,11 @@ function updateData(){
     for(const [kab,data] of Object.entries(dataKabupaten)){
         if(filterKabupaten!=="all" && filterKabupaten!==kab) continue;
 
-        // Pivot per sekolah
-        const sekolahMap = {};
+        const sekolahMap={};
         data.forEach(r=>{
             if(search && !r.sekolah.toLowerCase().includes(search)) return;
             if(filterKondisi!=="all" && r.kondisi!==filterKondisi) return;
-
-            if(!sekolahMap[r.sekolah]) sekolahMap[r.sekolah]={nilai:0,ditemukan:0,tidak:0,baik:0,ringan:0,berat:0, detail:[]};
+            if(!sekolahMap[r.sekolah]) sekolahMap[r.sekolah]={nilai:0,ditemukan:0,tidak:0,baik:0,ringan:0,berat:0,detail:[]};
             sekolahMap[r.sekolah].nilai += r.nilai;
             if(r.konfirmasi==="ditemukan") sekolahMap[r.sekolah].ditemukan++;
             else sekolahMap[r.sekolah].tidak++;
@@ -118,32 +192,18 @@ function updateData(){
             sekolahMap[r.sekolah].detail.push(r);
         });
 
-        // Hitung total per kabupaten
         let ditemukan=0,tidak=0,baik=0,ringan=0,berat=0,nilai=0;
         for(const val of Object.values(sekolahMap)){
-            ditemukan += val.ditemukan;
-            tidak += val.tidak;
-            baik += val.baik;
-            ringan += val.ringan;
-            berat += val.berat;
-            nilai += val.nilai;
+            ditemukan+=val.ditemukan; tidak+=val.tidak; baik+=val.baik; ringan+=val.ringan; berat+=val.berat; nilai+=val.nilai;
         }
-
-        total.Ditemukan += ditemukan;
-        total.Tidak += tidak;
-        total.Baik += baik;
-        total.Ringan += ringan;
-        total.Berat += berat;
-        total.Nilai += nilai;
+        total.Ditemukan+=ditemukan; total.Tidak+=tidak; total.Baik+=baik; total.Ringan+=ringan; total.Berat+=berat; total.Nilai+=nilai;
 
         tbodyHTML+=`<tr><td>${kab}</td><td>${ditemukan}</td><td>${tidak}</td><td>${baik}</td><td>${ringan}</td><td>${berat}</td><td>${formatRupiah(nilai)}</td></tr>`;
 
-        // Render daftar sekolah
         sekolahHTML+=`<h3>Daftar Sekolah - ${kab}</h3><table><thead><tr><th>Nama Sekolah</th><th>Jumlah Barang</th><th>Nilai Perolehan</th></tr></thead><tbody>`;
         let idx=0;
         for(const [sName,val] of Object.entries(sekolahMap)){
-            idx++; 
-            const detailId=`detail_${kab}_${idx}`;
+            idx++; const detailId=`detail_${kab}_${idx}`;
             sekolahHTML+=`<tr><td><button class="expand-btn" onclick="toggleDetailLazy('${detailId}','${kab}','${sName}')">➕</button>${sName}</td><td>${val.detail.length}</td><td>${formatRupiah(val.nilai)}</td></tr><tr id="${detailId}" style="display:none;" data-loaded="false"><td colspan="3"></td></tr>`;
         }
         sekolahHTML+=`</tbody></table>`;
@@ -199,3 +259,6 @@ function toggleDetailLazy(id,kab,sekolah){
 // === Start ===
 loadAllData();
 </script>
+
+</body>
+</html>
