@@ -75,13 +75,15 @@ button.expand-btn { background:#001f3f;color:white;border:none;padding:3px 6px;b
 <table id="rekapTable">
 <thead>
 <tr>
-<th>Kecamatan</th><th>Ditemukan</th><th>Tidak Ditemukan</th><th>Baik</th><th>Rusak Ringan</th><th>Rusak Berat</th><th>Nilai Perolehan</th>
+<th>Kecamatan</th><th>Ditemukan</th><th>Tidak Ditemukan</th>
+<th>Baik</th><th>Rusak Ringan</th><th>Rusak Berat</th><th>Nilai Perolehan</th>
 </tr>
 </thead>
 <tbody></tbody>
 <tfoot>
 <tr style="font-weight:bold; background:#e5e7eb; color:black;">
-<td>Total</td><td id="totalDitemukan">0</td><td id="totalTidakDitemukan">0</td><td id="totalBaik">0</td><td id="totalRusakRingan">0</td><td id="totalRusakBerat">0</td><td id="totalNilai">0</td>
+<td>Total</td><td id="totalDitemukan">0</td><td id="totalTidakDitemukan">0</td>
+<td id="totalBaik">0</td><td id="totalRusakRingan">0</td><td id="totalRusakBerat">0</td><td id="totalNilai">0</td>
 </tr>
 </tfoot>
 </table>
@@ -100,75 +102,45 @@ function toggleDarkMode(){
       document.body.classList.contains("dark-mode") ? "☀️" : "🌙";
 }
 
-// --- Endpoint Google Sheets per kecamatan ---
+// Endpoint Google Sheets per kecamatan
 const kecamatanEndpoints = {
-  "Banawa": "https://docs.google.com/spreadsheets/d/e/2PACX-1vSCAaRZ9atAiEb-BvMChP_3Wq6wtmUUlNiTWVtwzh7r9KX5sRRZpq5WppSrSebym8z6-qI3zfWQOTNu/pub?gid=0&single=true&output=csv",
-  "Banawa Tengah": "https://docs.google.com/spreadsheets/d/e/2PACX-1vToEAn2MqanfOGSKsDsV0cfGeXt6mJhf7DPEzgFeBl8GQkrbzd4iFuM3tRwyo_wV6m9PlxjQ-9Z0QhC/pub?gid=0&single=true&output=csv",
-  "Banawa Selatan": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQwth8ToDewTdvfvhlYuywOolNFwvc6eA4wer_OGKgNk-FoDvIQaHthsQHtMiis3cAsj4AnLzYKXG9p/pub?gid=0&single=true&output=csv",
-  "Rio Pakava": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQQX_Z6U7nanrMlPxL8N1m40jkFiMAHCIbZQA_iljNj3QZ8Z5FGMTAzYBbAC_D9Xy2PT3fUf0LL0n7F/pub?gid=0&single=true&output=csv",
-  "Pinembani": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQcReqyQvHT1K094wmITv7oL1dpVGSA7K139SmWIlNcJzVItMNLyCz0Q-u5Sg1H1QXs1R9mNyL73SBj/pub?gid=0&single=true&output=csv",
-  "Tanantovea": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQGT-OgwESxefxs2tnW_OoIZk2c76I6fKSqaQUoibT4B_-QVNtPPMZSDnEaawJRGaLB3tP-ChoDugoi/pub?gid=0&single=true&output=csv",
-  "Labuan": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQaDzmjVhNzRnMTJWg2JkvR1DYTiDSl2S6-MisvcSFD9P7MB2rVxA2zRgS0Rd0-f-xpIt1db1O1ppXx/pub?gid=0&single=true&output=csv",
-  "Sindue": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRnq_cellwa56qRzTfYLpUxHoLxpiQOBBmiAUCkdeJK8-tLMVawW9BLrWUA_Q_kMswogfdZlmWjHGQT/pub?gid=0&single=true&output=csv",
-  "Sindue Tombusabora": "https://docs.google.com/spreadsheets/d/e/2PACX-1vS11oEXPUetCOBorbbFNejuPEMsw4L8GYp-ETIbncBOgBfOtvLruTC82mUd-vxb7fj6sXopy16axzXi/pub?gid=0&single=true&output=csv",
-  "Sindue Tobata": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQg_48k1uaVtdc2v4UgVwn3PBxAFP4gfEhIR_OCBKVOcSrHRUYS1jPO1P1E1qnHGM_WcqDB2TFkE74t/pub?gid=0&single=true&output=csv",
-  "Sirenja": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQpFtH1q7lOez0grPXzNd1AAU93FZQZPSCyVrT4RneIumbxU0CbvukEfotyjhq01gYVLhK0_WblO_HO/pub?gid=0&single=true&output=csv",
-  "Balaesang": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQQevpAs3bjvgOzZDc8uq2PoebzqXVEFCvggoqJvn8AO-d1M0BCI0k7QYKB9hTgymfUIXx68oVR27IV/pub?gid=0&single=true&output=csv",
-  "Balaesang Tanjung": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQljJh_fOmCwjRVlTt5k8WxpN3TzaSyhWDXNnkDjI8hm62x1jdE41mXNENd2iGUueNyuXJuLa4jpoF6/pub?gid=0&single=true&output=csv",
-  "Dampelas": "https://docs.google.com/spreadsheets/d/e/2PACX-1vTTIi8ZSNx9-MetxVLFAxiS4MeBiFOuOeYbe4_Bf9EEQ2btWYDfIY15B6r_tBg33l0AFATRQrdoQyMq/pub?gid=0&single=true&output=csv",
-  "Sojol": "https://docs.google.com/spreadsheets/d/e/2PACX-1vR_M8W7eNSRgJiDs-lU0zBDAT2OEAN6J1g1G9UvgreUf7GS0_Q987XsgzYdDESWAu_P86BezxKn6nJl/pub?gid=0&single=true&output=csv",
-  "Sojol Utara": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRJAkrtkVPBLcUmM8OsByQDfndFGv-6MetoMsB_DGoqimZQGcAg9Lxe_glv_qAJoVXoY9TCHdnCDa6Y/pub?gid=0&single=true&output=csv"
+  "Banawa": "...csv-link...",
+  "Banawa Tengah": "...csv-link...",
+  "Banawa Selatan": "...csv-link...",
+  "Rio Pakava": "...csv-link...",
+  "Pinembani": "...csv-link...",
+  "Tanantovea": "...csv-link...",
+  "Labuan": "...csv-link...",
+  "Sindue": "...csv-link...",
+  "Sindue Tombusabora": "...csv-link...",
+  "Sindue Tobata": "...csv-link...",
+  "Sirenja": "...csv-link...",
+  "Balaesang": "...csv-link...",
+  "Balaesang Tanjung": "...csv-link...",
+  "Dampelas": "...csv-link...",
+  "Sojol": "...csv-link...",
+  "Sojol Utara": "...csv-link..."
 };
 
 let dataKecamatan = {};
 let chartKonfirmasi, chartKondisi, chartNilai;
 
-// ✅ Parsing angka format Indonesia / US lebih aman
+// Parsing angka format Indonesia
 function parseNumberIndo(val){
     if(!val) return 0;
-
-    // Bersihkan simbol & spasi
-    val = val.toString().trim()
-        .replace(/Rp/gi,'')
-        .replace(/\s/g,'');
-
-    // Jika ada titik & koma → cek mana desimal
-    if (val.includes('.') && val.includes(',')) {
-        // Contoh: "37.710,50" (Indonesia) → hapus titik, koma jadi desimal
-        if (val.lastIndexOf(',') > val.lastIndexOf('.')) {
-            val = val.replace(/\./g,'').replace(',','.');
-        }
-        // Contoh: "37,710.50" (US) → hapus koma, titik jadi desimal
-        else {
-            val = val.replace(/,/g,'');
-        }
-    }
-    // Kalau hanya ada koma → anggap ribuan
-    else if (val.includes(',') && !val.includes('.')) {
-        // Contoh: "37,710,000"
-        val = val.replace(/,/g,'');
-    }
-    // Kalau hanya ada titik → anggap ribuan
-    else if (val.includes('.') && !val.includes(',')) {
-        // Contoh: "37.710.000"
-        val = val.replace(/\./g,'');
-    }
-
+    val = val.toString().trim().replace(/Rp/gi,'').replace(/\s/g,'');
+    if(val.includes('.') && val.includes(',')){
+        if(val.lastIndexOf(',') > val.lastIndexOf('.')) val = val.replace(/\./g,'').replace(',','.');
+        else val = val.replace(/,/g,'');
+    } else if(val.includes(',')) val = val.replace(/,/g,'');
+    else if(val.includes('.')) val = val.replace(/\./g,'');
     return parseFloat(val) || 0;
 }
 
-
-// Format Rupiah
-function formatRupiah(num){
-    return "Rp " + (num||0).toLocaleString("id-ID");
-}
+function formatRupiah(num){ return "Rp "+(num||0).toLocaleString("id-ID"); }
 
 // Fetch CSV
-async function fetchData(url){
-    return new Promise(resolve => {
-        Papa.parse(url,{download:true,header:true,complete:res=>resolve(res.data)});
-    });
-}
+async function fetchData(url){ return new Promise(resolve => { Papa.parse(url,{download:true,header:true,complete:res=>resolve(res.data)}); }); }
 
 // Load data
 async function loadAllData(){
@@ -191,16 +163,12 @@ async function loadAllData(){
 // Populate filter
 function populateFilter(){
     const filter = document.getElementById("filterKecamatan");
-    Object.keys(dataKecamatan).forEach(k=>{
-        const opt=document.createElement("option");
-        opt.value=k; opt.textContent=k;
-        filter.appendChild(opt);
-    });
+    Object.keys(dataKecamatan).forEach(k=>{ const opt=document.createElement("option"); opt.value=k; opt.textContent=k; filter.appendChild(opt); });
     filter.addEventListener("change",updateData);
     document.getElementById("searchBox").addEventListener("input",updateData);
 }
 
-// Update tabel + chart
+// Update data
 function updateData(){
     const filter = document.getElementById("filterKecamatan").value;
     const search = document.getElementById("searchBox").value.toLowerCase();
@@ -208,24 +176,25 @@ function updateData(){
     tbody.innerHTML="";
     document.getElementById("sekolahSection").innerHTML="";
 
-    let total={Ditemukan:0,Tidak:0,Baik:0,Ringan:0,Berat:0,Nilai:0};
+    let total={Ditemukan:0,Tidak:0,Baik:0,Ringan:0,Berat:0,NilaiBaik:0,NilaiRingan:0,NilaiBerat:0,NilaiTotal:0};
 
     for(const [kec,data] of Object.entries(dataKecamatan)){
         if(filter!=="all" && filter!==kec) continue;
-        let ditemukan=0,tidak=0,baik=0,ringan=0,berat=0,nilai=0;
+        let ditemukan=0,tidak=0,baik=0,ringan=0,berat=0,nilaiBaik=0,nilaiRingan=0,nilaiBerat=0;
         const sekolahMap={};
 
         data.forEach(r=>{
             if(search && !r.sekolah.toLowerCase().includes(search)) return;
             if(r.konfirmasi==="ditemukan") ditemukan++; else tidak++;
-            if(r.kondisi==="baik") baik++;
-            else if(r.kondisi==="rusak ringan") ringan++;
-            else if(r.kondisi==="rusak berat") berat++;
-            nilai += r.nilai;
+            if(r.kondisi==="baik"){ baik++; nilaiBaik+=r.nilai; }
+            else if(r.kondisi==="rusak ringan"){ ringan++; nilaiRingan+=r.nilai; }
+            else if(r.kondisi==="rusak berat"){ berat++; nilaiBerat+=r.nilai; }
 
-            if(!sekolahMap[r.sekolah]) sekolahMap[r.sekolah]={barang:0,nilai:0,detail:[]};
+            if(!sekolahMap[r.sekolah]) sekolahMap[r.sekolah]={barang:0,NilaiBaik:0,NilaiRingan:0,NilaiBerat:0,detail:[]};
             sekolahMap[r.sekolah].barang++;
-            sekolahMap[r.sekolah].nilai+=r.nilai;
+            if(r.kondisi==="baik") sekolahMap[r.sekolah].NilaiBaik+=r.nilai;
+            else if(r.kondisi==="rusak ringan") sekolahMap[r.sekolah].NilaiRingan+=r.nilai;
+            else if(r.kondisi==="rusak berat") sekolahMap[r.sekolah].NilaiBerat+=r.nilai;
             sekolahMap[r.sekolah].detail.push(r);
         });
 
@@ -234,35 +203,30 @@ function updateData(){
         total.Baik+=baik;
         total.Ringan+=ringan;
         total.Berat+=berat;
-        total.Nilai+=nilai;
+        total.NilaiBaik+=nilaiBaik;
+        total.NilaiRingan+=nilaiRingan;
+        total.NilaiBerat+=nilaiBerat;
+        total.NilaiTotal+=nilaiBaik+nilaiRingan+nilaiBerat;
 
         const tr=document.createElement("tr");
-        tr.innerHTML=`<td>${kec}</td><td>${ditemukan}</td><td>${tidak}</td><td>${baik}</td><td>${ringan}</td><td>${berat}</td><td>${formatRupiah(nilai)}</td>`;
+        tr.innerHTML=`<td>${kec}</td>
+            <td>${ditemukan}</td>
+            <td>${tidak}</td>
+            <td>${baik} (${formatRupiah(nilaiBaik)})</td>
+            <td>${ringan} (${formatRupiah(nilaiRingan)})</td>
+            <td>${berat} (${formatRupiah(nilaiBerat)})</td>
+            <td>${formatRupiah(nilaiBaik+nilaiRingan+nilaiBerat)}</td>`;
         tbody.appendChild(tr);
-
-        let html=`<h3>Daftar Sekolah - ${kec}</h3><table><thead><tr><th>Nama Sekolah</th><th>Jumlah Barang</th><th>Nilai Perolehan</th></tr></thead><tbody>`;
-        let idx=0;
-        for(const [sName,val] of Object.entries(sekolahMap)){
-            idx++; const detailId=`detail_${kec}_${idx}`;
-            html+=`<tr><td><button class="expand-btn" onclick="toggleDetail('${detailId}')">➕</button>${sName}</td><td>${val.barang}</td><td>${formatRupiah(val.nilai)}</td></tr>`;
-            html+=`<tr id="${detailId}" style="display:none;"><td colspan="3"><table style="width:100%; border:1px solid #ddd; font-size:0.8rem;"><thead><tr><th>Nama Barang</th><th>NIBAR</th><th>Kondisi</th><th>Nilai</th></tr></thead><tbody>`;
-            val.detail.forEach(it=>{
-                html+=`<tr><td>${it.barang}</td><td>${it.nibar}</td><td>${it.kondisi}</td><td>${formatRupiah(it.nilai)}</td></tr>`;
-            });
-            html+=`</tbody></table></td></tr>`;
-        }
-        html+=`</tbody></table>`;
-        document.getElementById("sekolahSection").innerHTML+=html;
     }
 
     document.getElementById("totalDitemukan").textContent=total.Ditemukan;
     document.getElementById("totalTidakDitemukan").textContent=total.Tidak;
-    document.getElementById("totalBaik").textContent=total.Baik;
-    document.getElementById("totalRusakRingan").textContent=total.Ringan;
-    document.getElementById("totalRusakBerat").textContent=total.Berat;
-    document.getElementById("totalNilai").textContent=formatRupiah(total.Nilai);
-    document.getElementById("lastUpdate").textContent="Data terakhir diperbarui: "+new Date().toLocaleTimeString();
+    document.getElementById("totalBaik").textContent=total.Baik + " ("+formatRupiah(total.NilaiBaik)+")";
+    document.getElementById("totalRusakRingan").textContent=total.Ringan + " ("+formatRupiah(total.NilaiRingan)+")";
+    document.getElementById("totalRusakBerat").textContent=total.Berat + " ("+formatRupiah(total.NilaiBerat)+")";
+    document.getElementById("totalNilai").textContent=formatRupiah(total.NilaiTotal);
 
+    document.getElementById("lastUpdate").textContent="Data terakhir diperbarui: "+new Date().toLocaleTimeString();
     updateCharts(total);
 }
 
@@ -287,22 +251,14 @@ function updateCharts(total){
 
     chartNilai=new Chart(ctx3,{
         type:"doughnut",
-        data:{labels:["Total Nilai Barang"],datasets:[{data:[total.Nilai],backgroundColor:["#6366f1"]}]},
+        data:{labels:["Nilai Baik","Nilai Rusak Ringan","Nilai Rusak Berat"],datasets:[{data:[total.NilaiBaik,total.NilaiRingan,total.NilaiBerat],backgroundColor:["#3b82f6","#facc15","#f87171"]}]},
         options:{plugins:{tooltip:{callbacks:{label:ctx=>formatRupiah(ctx.raw)}}}}
     });
-}
-
-// Toggle detail sekolah
-function toggleDetail(id){
-    const row=document.getElementById(id);
-    if(!row) return;
-    const btn=row.previousElementSibling.querySelector("button");
-    if(row.style.display==="none"){row.style.display="table-row"; btn.textContent="➖";}
-    else{row.style.display="none"; btn.textContent="➕";}
 }
 
 // Start
 loadAllData();
 </script>
+
 </body>
 </html>
