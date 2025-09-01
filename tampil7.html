@@ -57,10 +57,17 @@ button.expand-btn { background:#001f3f;color:white;border:none;padding:3px 6px;b
 <h2 style="text-align:center;">DINAS PENDIDIKAN DAN KEBUDAYAAN</h2>
 
 <div class="controls">
-<label><b>Filter Kecamatan:</b></label>
-<select id="filterKecamatan"><option value="all">Semua Kecamatan</option></select>
-<label><b>Cari Sekolah:</b></label>
-<input type="text" id="searchBox" placeholder="Ketik nama sekolah...">
+  <label><b>Filter Kecamatan:</b></label>
+  <select id="filterKecamatan"><option value="all">Semua Kecamatan</option></select>
+  <label><b>Cari Sekolah:</b></label>
+  <input type="text" id="searchBox" placeholder="Ketik nama sekolah...">
+  <label><b>Filter Kondisi:</b></label>
+  <select id="filterKondisi">
+    <option value="all">Semua</option>
+    <option value="baik">Baik</option>
+    <option value="rusak ringan">Rusak Ringan</option>
+    <option value="rusak berat">Rusak Berat</option>
+  </select>
 </div>
 
 <div class="dashboard">
@@ -165,32 +172,36 @@ async function loadAllData(){
     setInterval(updateData,300000);
 }
 
-// Populate filter kecamatan
+// Populate filter kecamatan & kondisi
 function populateFilter(){
     const filter = document.getElementById("filterKecamatan");
     Object.keys(dataKecamatan).forEach(k=>{
         const opt=document.createElement("option"); opt.value=k; opt.textContent=k;
         filter.appendChild(opt);
     });
-    filter.addEventListener("change",updateData);
+    filter.addEventListener("change", debounce(updateData,300));
     document.getElementById("searchBox").addEventListener("input", debounce(updateData,300));
+    document.getElementById("filterKondisi").addEventListener("change", debounce(updateData,300));
 }
 
 // Update tabel & chart
 function updateData(){
-    const filter=document.getElementById("filterKecamatan").value;
+    const filterKecamatan = document.getElementById("filterKecamatan").value;
+    const filterKondisi = document.getElementById("filterKondisi").value;
     const search=document.getElementById("searchBox").value.toLowerCase();
     let total={Ditemukan:0,Tidak:0,Baik:0,Ringan:0,Berat:0,Nilai:0};
     let tbodyHTML="";
     let sekolahHTML="";
 
     for(const [kec,data] of Object.entries(dataKecamatan)){
-        if(filter!=="all" && filter!==kec) continue;
+        if(filterKecamatan!=="all" && filterKecamatan!==kec) continue;
         let ditemukan=0,tidak=0,baik=0,ringan=0,berat=0,nilai=0;
         const sekolahMap={};
 
         data.forEach(r=>{
             if(search && !r.sekolah.toLowerCase().includes(search)) return;
+            if(filterKondisi !== "all" && r.kondisi !== filterKondisi) return;
+
             if(r.konfirmasi==="ditemukan") ditemukan++; else tidak++;
             if(r.kondisi==="baik") baik++;
             else if(r.kondisi==="rusak ringan") ringan++;
