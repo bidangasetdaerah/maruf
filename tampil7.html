@@ -114,20 +114,12 @@ function debounce(func, wait){ let timeout; return (...args)=>{ clearTimeout(tim
 function parseNumberIndo(val){
     if(!val) return 0;
     val = val.toString().trim();
-    val = val.replace(/Rp/gi, '').replace(/\s/g, '').replace(/[^0-9.,-]/g,'');
-    if(val.includes('.') && val.includes(',')){
-        if(val.lastIndexOf(',') > val.lastIndexOf('.')){
-            val = val.replace(/\./g,'').replace(',', '.');
-        } else {
-            val = val.replace(/,/g,'');
-        }
-    } else if(val.includes(',')){
-        val = val.replace(',', '.');
-    } else {
-        val = val.replace(/\./g,'');
-    }
+    val = val.replace(/Rp/gi,'').replace(/\s/g,''); // hapus Rp dan spasi
+    val = val.replace(/\./g,''); // hapus titik ribuan
+    val = val.replace(/,/g,'.'); // ubah koma jadi desimal jika ada
     return parseFloat(val) || 0;
 }
+
 function normalizeKondisi(val){
     if(!val) return "baik";
     val = val.toString().toLowerCase().trim().replace(/\s+/g," ");
@@ -136,12 +128,12 @@ function normalizeKondisi(val){
     if(val.includes("baik")||val==="b") return "baik";
     return "baik";
 }
+
 function formatRupiah(num){ return "Rp "+(num||0).toLocaleString("id-ID"); }
 
 // === Endpoint CSV Kabupaten ===
 const kabupatenEndpoints = {
   "Donggala": "https://docs.google.com/spreadsheets/d/e/2PACX-1vSebUxTRRPKz3bnjVy0GcfjwU3ouuZ67B8pMO7o56lMPZMrCscTqw3XbQ6UFjevabMYB_Ml_vVrfRln/pub?gid=982774577&single=true&output=csv",
- 
 };
 
 // === Fetch CSV ===
@@ -255,6 +247,7 @@ function toggleDetailLazy(id,kab,sekolah){
 // === Start ===
 loadAllData();
 </script>
+
 
 </body>
 </html>
