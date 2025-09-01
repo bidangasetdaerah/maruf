@@ -1,40 +1,55 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dashboard Inventaris</title>
-  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-  <script src="https://cdn.tailwindcss.com"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Inventaris Aset</title>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-50 font-sans p-6">
 
-  <h1 class="text-3xl font-bold text-center mb-6">Dashboard Inventaris Aset</h1>
+<h1 class="text-3xl font-bold text-center mb-6">Dashboard Inventaris Aset</h1>
 
-  <div id="filterBox" class="flex flex-col md:flex-row justify-center gap-4 mb-6">
-    <div>
-      <label for="filterKecamatan" class="mr-2 font-semibold">Filter Kecamatan:</label>
-      <select id="filterKecamatan" class="border rounded px-2 py-1">
-        <option value="">Semua</option>
-      </select>
-    </div>
-    <div>
-      <label for="searchInput" class="mr-2 font-semibold">Cari:</label>
-      <input type="text" id="searchInput" placeholder="Sekolah / Barang..." class="border rounded px-2 py-1">
-    </div>
+<div class="flex flex-col md:flex-row justify-center gap-4 mb-6">
+  <div>
+    <label for="filterKecamatan" class="font-semibold mr-2">Filter Kecamatan:</label>
+    <select id="filterKecamatan" class="border rounded px-2 py-1">
+      <option value="">Semua</option>
+    </select>
   </div>
-
-  <div id="rekap" class="bg-white border p-4 rounded shadow mb-6">
-    <h3 class="font-semibold text-lg mb-2">Ringkasan Data</h3>
-    <div id="rekapContent">Sedang memuat...</div>
+  <div>
+    <label for="searchInput" class="font-semibold mr-2">Cari Sekolah / Barang:</label>
+    <input type="text" id="searchInput" placeholder="Ketik..." class="border rounded px-2 py-1">
   </div>
+</div>
 
-  <div id="loading" class="text-center text-gray-700 mb-4">Sedang memuat data...</div>
-  <div id="dataTable"></div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+  <div class="bg-white p-4 rounded shadow">
+    <h2 class="font-semibold mb-2 text-center">Rekap Konfirmasi</h2>
+    <canvas id="chartKonfirmasi"></canvas>
+  </div>
+  <div class="bg-white p-4 rounded shadow">
+    <h2 class="font-semibold mb-2 text-center">Rekap Kondisi Barang</h2>
+    <canvas id="chartKondisi"></canvas>
+  </div>
+  <div class="bg-white p-4 rounded shadow">
+    <h2 class="font-semibold mb-2 text-center">Rekap Nilai Perolehan</h2>
+    <canvas id="chartNilai"></canvas>
+  </div>
+</div>
 
-  <script>
-    const kecamatanEndpoints = {
-          "Banawa": "https://docs.google.com/spreadsheets/d/e/2PACX-1vSCAaRZ9atAiEb-BvMChP_3Wq6wtmUUlNiTWVtwzh7r9KX5sRRZpq5WppSrSebym8z6-qI3zfWQOTNu/pub?gid=0&single=true&output=csv",
+<div id="rekap" class="bg-white border p-4 rounded shadow mb-6">
+  <h3 class="font-semibold text-lg mb-2">Ringkasan Data</h3>
+  <div id="rekapContent">Sedang memuat...</div>
+</div>
+
+<div id="dataTable"></div>
+
+<script>
+const kecamatanEndpoints = {
+  "Banawa": "https://docs.google.com/spreadsheets/d/e/2PACX-1vSCAaRZ9atAiEb-BvMChP_3Wq6wtmUUlNiTWVtwzh7r9KX5sRRZpq5WppSrSebym8z6-qI3zfWQOTNu/pub?gid=0&single=true&output=csv",
   "Banawa Tengah": "https://docs.google.com/spreadsheets/d/e/2PACX-1vToEAn2MqanfOGSKsDsV0cfGeXt6mJhf7DPEzgFeBl8GQkrbzd4iFuM3tRwyo_wV6m9PlxjQ-9Z0QhC/pub?gid=0&single=true&output=csv",
   "Banawa Selatan": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQwth8ToDewTdvfvhlYuywOolNFwvc6eA4wer_OGKgNk-FoDvIQaHthsQHtMiis3cAsj4AnLzYKXG9p/pub?gid=0&single=true&output=csv",
   "Rio Pakava": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQQX_Z6U7nanrMlPxL8N1m40jkFiMAHCIbZQA_iljNj3QZ8Z5FGMTAzYBbAC_D9Xy2PT3fUf0LL0n7F/pub?gid=0&single=true&output=csv",
@@ -50,155 +65,173 @@
   "Dampelas": "https://docs.google.com/spreadsheets/d/e/2PACX-1vTTIi8ZSNx9-MetxVLFAxiS4MeBiFOuOeYbe4_Bf9EEQ2btWYDfIY15B6r_tBg33l0AFATRQrdoQyMq/pub?gid=0&single=true&output=csv",
   "Sojol": "https://docs.google.com/spreadsheets/d/e/2PACX-1vR_M8W7eNSRgJiDs-lU0zBDAT2OEAN6J1g1G9UvgreUf7GS0_Q987XsgzYdDESWAu_P86BezxKn6nJl/pub?gid=0&single=true&output=csv",
   "Sojol Utara": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRJAkrtkVPBLcUmM8OsByQDfndFGv-6MetoMsB_DGoqimZQGcAg9Lxe_glv_qAJoVXoY9TCHdnCDa6Y/pub?gid=0&single=true&output=csv"
-    };
+};
 
-    let allDataGlobal = [];
-    let currentFilter = "";
-    let currentSearch = "";
+let allDataGlobal = [];
+let currentFilter = "";
+let currentSearch = "";
+let chartKonfirmasi, chartKondisi, chartNilai;
 
-    async function fetchData(url) {
-      return new Promise((resolve, reject) => {
-        Papa.parse(url, {
-          download: true,
-          header: true,
-          complete: results => resolve(results.data),
-          error: err => reject(err)
-        });
-      });
+async function fetchData(url){
+  return new Promise(resolve => {
+    Papa.parse(url,{download:true,header:true,complete:res=>resolve(res.data)});
+  });
+}
+
+function mapRow(r){
+  return {
+    sekolah: r["Nama Sekolah"]||r["Pengguna Barang"]||"",
+    barang: r["Nama Barang"]||"",
+    nibar: r["NIBAR"]||r["No. Register"]||"",
+    konfirmasi: (r["Konfirmasi Keberadaan"]||"Tidak Ditemukan").toLowerCase().trim(),
+    kondisi: (r["Kondisi"]||"baik").toLowerCase().trim(),
+    nilai: r["Nilai Perolehan"]||r["Harga Perolehan"]||""
+  };
+}
+
+async function loadAllData(){
+  let allData=[];
+  for(const [kec,url] of Object.entries(kecamatanEndpoints)){
+    try{
+      const raw=await fetchData(url);
+      allData=allData.concat(raw.map(r=>({kecamatan:kec,...mapRow(r)})));
+    }catch(e){console.error("Gagal load",kec,e);}
+  }
+  allDataGlobal=allData;
+  updateFilterOptions(allData);
+  renderData();
+}
+
+function updateFilterOptions(data){
+  const setKec=new Set(data.map(d=>d.kecamatan));
+  const select=document.getElementById("filterKecamatan");
+  setKec.forEach(kec=>{
+    if(![...select.options].some(opt=>opt.value===kec)){
+      const option=document.createElement("option");
+      option.value=kec; option.textContent=kec;
+      select.appendChild(option);
     }
+  });
+}
 
-    function mapRow(r) {
-      return {
-        sekolah: r["Nama Sekolah"] || r["Sekolah"] || r["Pengguna Barang"] || "",
-        barang: r["Nama Barang"] || r["Barang"] || "",
-        nibar: r["NIBAR"] || r["No. Register"] || "",
-        konfirmasi: (r["Konfirmasi Keberadaan Kondisi Saat ini"] || r["Konfirmasi Keberadaan"] || r["Konfirmasi"] || "Tidak Ditemukan").toLowerCase().trim(),
-        nilai: r["Nilai Perolehan"] || r["Harga Perolehan"] || r["Nilai"] || ""
-      };
+function applyFilters(data){
+  return data.filter(d=>{
+    if(!d.sekolah && !d.barang) return false;
+    if(currentFilter && d.kecamatan!==currentFilter) return false;
+    if(currentSearch){
+      const keyword=currentSearch.toLowerCase().trim();
+      return d.sekolah.toLowerCase().includes(keyword)||d.barang.toLowerCase().includes(keyword);
     }
+    return true;
+  });
+}
 
-    async function loadAllData() {
-      document.getElementById("loading").style.display = "block";
-      let allData = [];
-      for (const [kec, url] of Object.entries(kecamatanEndpoints)) {
-        try {
-          const raw = await fetchData(url);
-          const mapped = raw.map(r => ({ kecamatan: kec, ...mapRow(r) }));
-          allData = allData.concat(mapped);
-        } catch (e) { console.error("Gagal load", kec, e); }
-      }
-      allDataGlobal = allData;
-      updateFilterOptions(allData);
-      renderData();
-      document.getElementById("loading").style.display = "none";
-    }
+function updateRekap(data){
+  const totalBarang=data.length;
+  const byKec={};
+  data.forEach(d=>{
+    if(!byKec[d.kecamatan]) byKec[d.kecamatan]={count:0};
+    byKec[d.kecamatan].count++;
+  });
+  let html=`<p><b>Total Barang:</b> ${totalBarang}</p><ul class="list-disc ml-5">`;
+  for(const [kec,val] of Object.entries(byKec)){
+    html+=`<li><b>${kec}</b>: ${val.count} barang</li>`;
+  }
+  html+="</ul>";
+  document.getElementById("rekapContent").innerHTML=html;
+}
 
-    function updateFilterOptions(data) {
-      const kecamatanSet = new Set(data.map(d => d.kecamatan));
-      const select = document.getElementById("filterKecamatan");
-      kecamatanSet.forEach(kec => {
-        if (![...select.options].some(opt => opt.value === kec)) {
-          const option = document.createElement("option");
-          option.value = kec;
-          option.textContent = kec;
-          select.appendChild(option);
-        }
-      });
-    }
+function updateCharts(data){
+  const totalDitemukan=data.filter(d=>d.konfirmasi==="ditemukan").length;
+  const totalTidak=data.filter(d=>d.konfirmasi!=="ditemukan").length;
+  const totalBaik=data.filter(d=>d.kondisi==="baik").length;
+  const totalRingan=data.filter(d=>d.kondisi==="rusak ringan").length;
+  const totalBerat=data.filter(d=>d.kondisi==="rusak berat").length;
+  const totalNilai=data.reduce((sum,d)=>sum+parseFloat(d.nilai.replace(/\./g,'').replace(',','.'))||0,0);
 
-    function applyFilters(data) {
-      return data.filter(d => {
-        if (!d.sekolah && !d.barang) return false;
-        if (currentFilter && d.kecamatan !== currentFilter) return false;
-        if (currentSearch) {
-          const keyword = currentSearch.toLowerCase().trim();
-          return d.sekolah.toLowerCase().includes(keyword) || d.barang.toLowerCase().includes(keyword);
-        }
-        return true;
-      });
-    }
+  const ctx1=document.getElementById("chartKonfirmasi").getContext("2d");
+  const ctx2=document.getElementById("chartKondisi").getContext("2d");
+  const ctx3=document.getElementById("chartNilai").getContext("2d");
+  if(chartKonfirmasi) chartKonfirmasi.destroy();
+  if(chartKondisi) chartKondisi.destroy();
+  if(chartNilai) chartNilai.destroy();
 
-    function updateRekap(data) {
-      const totalBarang = data.length;
-      let html = `<p><b>Total Barang:</b> ${totalBarang}</p>`;
-      const byKec = {};
-      data.forEach(d => {
-        if (!byKec[d.kecamatan]) byKec[d.kecamatan] = { count:0 };
-        byKec[d.kecamatan].count++;
-      });
-      html += "<ul class='list-disc ml-5'>";
-      for (const [kec,val] of Object.entries(byKec)) {
-        html += `<li><b>${kec}</b>: ${val.count} barang</li>`;
-      }
-      html += "</ul>";
-      document.getElementById("rekapContent").innerHTML = html;
-    }
+  chartKonfirmasi=new Chart(ctx1,{
+    type:"pie",
+    data:{labels:["Ditemukan","Tidak Ditemukan"],datasets:[{data:[totalDitemukan,totalTidak],backgroundColor:["#10b981","#ef4444"]}]}
+  });
+  chartKondisi=new Chart(ctx2,{
+    type:"bar",
+    data:{labels:["Baik","Rusak Ringan","Rusak Berat"],datasets:[{data:[totalBaik,totalRingan,totalBerat],backgroundColor:["#3b82f6","#facc15","#f87171"]}]}
+  });
+  chartNilai=new Chart(ctx3,{
+    type:"doughnut",
+    data:{labels:["Total Nilai"],datasets:[{data:[totalNilai],backgroundColor:["#6366f1"]}]},
+    options:{plugins:{tooltip:{callbacks:{label:ctx=>"Rp "+ctx.raw.toLocaleString("id-ID")}}}}
+  });
+}
 
-    function updateTable(data) {
-      const container = document.getElementById("dataTable");
-      container.innerHTML = "";
-      const grouped = {};
-      data.forEach(d => {
-        if (!grouped[d.sekolah]) grouped[d.sekolah] = [];
-        grouped[d.sekolah].push(d);
-      });
-      for (const [sekolah, items] of Object.entries(grouped)) {
-        const btn = document.createElement("button");
-        btn.className = "collapsible w-full text-left bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded mb-2 font-semibold";
-        btn.textContent = `${sekolah} (${items.length} barang)`;
-        const content = document.createElement("div");
-        content.className = "content overflow-hidden transition-max-height duration-300 mb-4";
+function updateTable(data){
+  const container=document.getElementById("dataTable");
+  container.innerHTML="";
+  const grouped={};
+  data.forEach(d=>{
+    if(!grouped[d.sekolah]) grouped[d.sekolah]=[];
+    grouped[d.sekolah].push(d);
+  });
+  for(const [sekolah,items] of Object.entries(grouped)){
+    const btn=document.createElement("button");
+    btn.className="w-full text-left bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded mb-2 font-semibold";
+    btn.textContent=`${sekolah} (${items.length} barang)`;
+    const content=document.createElement("div");
+    content.className="overflow-hidden max-h-0 transition-all mb-4";
 
-        const table = document.createElement("table");
-        table.className = "min-w-full border border-gray-300";
-        table.innerHTML = `
-          <thead class="bg-gray-100">
-            <tr>
-              <th class="border px-2 py-1">Kecamatan</th>
-              <th class="border px-2 py-1">Barang</th>
-              <th class="border px-2 py-1">No. Register</th>
-              <th class="border px-2 py-1">Konfirmasi</th>
-              <th class="border px-2 py-1">Nilai</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${items.map(d => `<tr>
-              <td class="border px-2 py-1">${d.kecamatan}</td>
-              <td class="border px-2 py-1">${d.barang}</td>
-              <td class="border px-2 py-1">${d.nibar}</td>
-              <td class="border px-2 py-1">${d.konfirmasi}</td>
-              <td class="border px-2 py-1">${d.nilai}</td>
-            </tr>`).join('')}
-          </tbody>`;
+    const table=document.createElement("table");
+    table.className="min-w-full border border-gray-300";
+    table.innerHTML=`
+      <thead class="bg-gray-100">
+        <tr>
+          <th class="border px-2 py-1">Kecamatan</th>
+          <th class="border px-2 py-1">Barang</th>
+          <th class="border px-2 py-1">No. Register</th>
+          <th class="border px-2 py-1">Konfirmasi</th>
+          <th class="border px-2 py-1">Kondisi</th>
+          <th class="border px-2 py-1">Nilai</th>
+        </tr>
+      </thead>
+      <tbody>${items.map(d=>`<tr>
+        <td class="border px-2 py-1">${d.kecamatan}</td>
+        <td class="border px-2 py-1">${d.barang}</td>
+        <td class="border px-2 py-1">${d.nibar}</td>
+        <td class="border px-2 py-1">${d.konfirmasi}</td>
+        <td class="border px-2 py-1">${d.kondisi}</td>
+        <td class="border px-2 py-1">${d.nilai}</td>
+      </tr>`).join('')}</tbody>`;
+    content.appendChild(table);
+    container.appendChild(btn);
+    container.appendChild(content);
 
-        content.appendChild(table);
-        container.appendChild(btn);
-        container.appendChild(content);
+    btn.addEventListener("click",()=>{content.classList.toggle("max-h-96");});
+  }
+}
 
-        btn.addEventListener("click", function() {
-          content.classList.toggle("show");
-        });
-      }
-    }
+function renderData(){
+  const filtered=applyFilters(allDataGlobal);
+  updateTable(filtered);
+  updateRekap(filtered);
+  updateCharts(filtered);
+}
 
-    function renderData() {
-      const filtered = applyFilters(allDataGlobal);
-      updateTable(filtered);
-      updateRekap(filtered);
-    }
+document.getElementById("filterKecamatan").addEventListener("change",e=>{
+  currentFilter=e.target.value;
+  renderData();
+});
+document.getElementById("searchInput").addEventListener("input",e=>{
+  currentSearch=e.target.value;
+  renderData();
+});
 
-    document.getElementById("filterKecamatan").addEventListener("change", e => {
-      currentFilter = e.target.value;
-      renderData();
-    });
-
-    document.getElementById("searchInput").addEventListener("input", e => {
-      currentSearch = e.target.value;
-      renderData();
-    });
-
-    loadAllData();
-  </script>
-
+loadAllData();
+</script>
 </body>
 </html>
