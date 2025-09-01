@@ -182,7 +182,6 @@ function updateData(){
     const search=document.getElementById("searchBox").value.toLowerCase();
     let total={Ditemukan:0,Tidak:0,Baik:0,Ringan:0,Berat:0,Nilai:0};
     let tbodyHTML="";
-
     let sekolahHTML="";
 
     for(const [kec,data] of Object.entries(dataKecamatan)){
@@ -262,9 +261,15 @@ function toggleDetailLazy(id,kec,sekolah){
         if(row.dataset.loaded!=="true"){
             const detailData = dataKecamatan[kec].filter(r=>r.sekolah===sekolah);
             let innerHTML=`<table style="width:100%; border:1px solid #ddd; font-size:0.8rem;">
-                <thead><tr><th>Nama Barang</th><th>NIBAR</th><th>Kondisi</th><th>Nilai</th></tr></thead><tbody>`;
+                <thead><tr><th>Kecamatan</th><th>Nama Barang</th><th>NIBAR</th><th>Kondisi</th><th>Nilai</th></tr></thead><tbody>`;
             detailData.forEach(it=>{
-                innerHTML+=`<tr><td>${it.barang}</td><td>${it.nibar}</td><td>${it.kondisi}</td><td>${formatRupiah(it.nilai)}</td></tr>`;
+                innerHTML+=`<tr>
+                    <td>${kec}</td>
+                    <td>${it.barang}</td>
+                    <td>${it.nibar}</td>
+                    <td>${it.kondisi}</td>
+                    <td>${formatRupiah(it.nilai)}</td>
+                </tr>`;
             });
             innerHTML+=`</tbody></table>`;
             row.children[0].innerHTML=innerHTML;
