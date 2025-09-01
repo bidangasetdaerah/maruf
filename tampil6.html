@@ -9,9 +9,6 @@
     body { font-family: Arial, sans-serif; padding: 20px; }
     h1 { text-align: center; }
     #loading { text-align:center; font-size:18px; margin:20px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-    th { background-color: #f4f4f4; }
     #filterBox { margin: 20px 0; text-align:center; }
     #rekap { margin: 20px 0; padding: 10px; background: #f9f9f9; border: 1px solid #ddd; }
     #rekap h3 { margin-top: 0; }
@@ -24,18 +21,19 @@
       text-align: left;
       outline: none;
       font-size: 16px;
+      margin-bottom: 5px;
     }
-    .active, .collapsible:hover {
-      background-color: #ccc;
-    }
+    .active, .collapsible:hover { background-color: #ccc; }
     .content {
-      padding: 0 10px;
-      display: none;
+      max-height: 0;
       overflow: hidden;
+      transition: max-height 0.3s ease;
       border-left: 2px solid #ddd;
       margin-bottom: 10px;
+      padding: 0 10px;
     }
-    .item-table { width: 100%; border-collapse: collapse; }
+    .content.show { max-height: 1000px; }
+    .item-table { width: 100%; border-collapse: collapse; margin-top: 5px; }
     .item-table th, .item-table td { border: 1px solid #ddd; padding: 6px; text-align: left; }
     .item-table th { background-color: #f4f4f4; }
   </style>
@@ -45,9 +43,7 @@
 
   <div id="filterBox">
     <label for="filterKecamatan">Filter Kecamatan: </label>
-    <select id="filterKecamatan">
-      <option value="">Semua</option>
-    </select>
+    <select id="filterKecamatan"><option value="">Semua</option></select>
     &nbsp;&nbsp;
     <label for="searchInput">Cari: </label>
     <input type="text" id="searchInput" placeholder="Sekolah / Barang...">
@@ -63,7 +59,7 @@
 
   <script>
     const kecamatanEndpoints = {
-     "Banawa": "https://docs.google.com/spreadsheets/d/e/2PACX-1vSCAaRZ9atAiEb-BvMChP_3Wq6wtmUUlNiTWVtwzh7r9KX5sRRZpq5WppSrSebym8z6-qI3zfWQOTNu/pub?gid=0&single=true&output=csv",
+       "Banawa": "https://docs.google.com/spreadsheets/d/e/2PACX-1vSCAaRZ9atAiEb-BvMChP_3Wq6wtmUUlNiTWVtwzh7r9KX5sRRZpq5WppSrSebym8z6-qI3zfWQOTNu/pub?gid=0&single=true&output=csv",
   "Banawa Tengah": "https://docs.google.com/spreadsheets/d/e/2PACX-1vToEAn2MqanfOGSKsDsV0cfGeXt6mJhf7DPEzgFeBl8GQkrbzd4iFuM3tRwyo_wV6m9PlxjQ-9Z0QhC/pub?gid=0&single=true&output=csv",
   "Banawa Selatan": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQwth8ToDewTdvfvhlYuywOolNFwvc6eA4wer_OGKgNk-FoDvIQaHthsQHtMiis3cAsj4AnLzYKXG9p/pub?gid=0&single=true&output=csv",
   "Rio Pakava": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQQX_Z6U7nanrMlPxL8N1m40jkFiMAHCIbZQA_iljNj3QZ8Z5FGMTAzYBbAC_D9Xy2PT3fUf0LL0n7F/pub?gid=0&single=true&output=csv",
@@ -98,7 +94,7 @@
 
     function parseNumberIndo(str) {
       if (!str) return 0;
-      return parseFloat(str.replace(/\./g, '').replace(',', '.')) || 0;
+      return parseFloat(str.trim().replace(/\./g, '').replace(',', '.')) || 0;
     }
 
     function mapRow(r) {
@@ -114,17 +110,13 @@
     async function loadAllData() {
       document.getElementById("loading").style.display = "block";
       let allData = [];
-
       for (const [kec, url] of Object.entries(kecamatanEndpoints)) {
         try {
           const raw = await fetchData(url);
           const mapped = raw.map(r => ({ kecamatan: kec, ...mapRow(r) }));
           allData = allData.concat(mapped);
-        } catch (e) {
-          console.error("Gagal load", kec, e);
-        }
+        } catch (e) { console.error("Gagal load", kec, e); }
       }
-
       allDataGlobal = allData;
       updateFilterOptions(allData);
       renderData();
@@ -149,11 +141,8 @@
         if (!d.sekolah && !d.barang) return false;
         if (currentFilter && d.kecamatan !== currentFilter) return false;
         if (currentSearch) {
-          const keyword = currentSearch.toLowerCase();
-          return (
-            d.sekolah.toLowerCase().includes(keyword) ||
-            d.barang.toLowerCase().includes(keyword)
-          );
+          const keyword = currentSearch.toLowerCase().trim();
+          return d.sekolah.toLowerCase().includes(keyword) || d.barang.toLowerCase().includes(keyword);
         }
         return true;
       });
@@ -163,16 +152,14 @@
       const totalBarang = data.length;
       const totalNilai = data.reduce((sum, d) => sum + d.nilai, 0);
       let html = `<p><b>Total Barang:</b> ${totalBarang.toLocaleString()} | <b>Total Nilai:</b> Rp ${totalNilai.toLocaleString("id-ID")}</p>`;
-
       const byKec = {};
       data.forEach(d => {
-        if (!byKec[d.kecamatan]) byKec[d.kecamatan] = { count: 0, nilai: 0 };
+        if (!byKec[d.kecamatan]) byKec[d.kecamatan] = { count:0, nilai:0 };
         byKec[d.kecamatan].count++;
         byKec[d.kecamatan].nilai += d.nilai;
       });
-
       html += "<ul>";
-      for (const [kec, val] of Object.entries(byKec)) {
+      for (const [kec,val] of Object.entries(byKec)) {
         html += `<li><b>${kec}</b>: ${val.count.toLocaleString()} barang | Rp ${val.nilai.toLocaleString("id-ID")}</li>`;
       }
       html += "</ul>";
@@ -187,11 +174,11 @@
         if (!grouped[d.sekolah]) grouped[d.sekolah] = [];
         grouped[d.sekolah].push(d);
       });
-
       for (const [sekolah, items] of Object.entries(grouped)) {
+        const totalNilaiSekolah = items.reduce((s,d)=>s+d.nilai,0);
         const btn = document.createElement("button");
         btn.className = "collapsible";
-        btn.textContent = `${sekolah} (${items.length} barang)`;
+        btn.textContent = `${sekolah} (${items.length} barang | Rp ${totalNilaiSekolah.toLocaleString("id-ID")})`;
         const content = document.createElement("div");
         content.className = "content";
         const table = document.createElement("table");
@@ -221,7 +208,7 @@
 
         btn.addEventListener("click", function() {
           this.classList.toggle("active");
-          content.style.display = content.style.display === "block" ? "none" : "block";
+          content.classList.toggle("show");
         });
       }
     }
