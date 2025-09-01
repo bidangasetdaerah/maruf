@@ -1,592 +1,280 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="utf-8" />
-  <title>Dashboard Aset Sekolah — Rekap Kabupaten</title>
-
-  <!-- Tailwind for styling -->
-  <script src="https://cdn.tailwindcss.com"></script>
-
-  <!-- Libraries -->
-  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.3.0/dist/chart.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <style>
-    /* small helper to avoid Tailwind-only issues */
-    .card { background: white; border-radius: 8px; padding: 1rem; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard KIB B - DINAS PENDIDIKAN DAN KEBUDAYAAN</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<style>
+body { font-family:sans-serif; margin:0; background:#f9fafb; transition:0.3s; }
+header { position:fixed; top:0; left:0; right:0; background:#001f3f; color:white; padding:12px 15px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; z-index:1000; box-shadow:0 2px 6px rgba(0,0,0,0.2);}
+header h1 { margin:0; font-size:1.1rem; }
+header nav a { color:white; text-decoration:none; margin-right:10px; font-size:0.9rem;}
+header nav a:hover { text-decoration:underline; }
+.dark-toggle { background:none;border:none;color:white;font-size:1.4rem;cursor:pointer;}
+main { padding-top:85px; min-height:80vh;}
+footer { background:#001f3f;color:#f3f4f6;text-align:center;padding:15px 10px;font-size:0.85rem;}
+h2 { font-size:1.2rem;margin-top:20px; }
+h3 { font-size:1rem;margin-top:15px;color:#1f2937; }
+.dashboard { display:flex; flex-wrap:wrap; gap:10px; margin-top:15px; padding:0 10px; }
+.chart-container, table { background:white; border-radius:8px; padding:10px; box-shadow:0 2px 6px rgba(0,0,0,0.1); width:100%; }
+.chart-container { flex:1 1 300px; }
+canvas { width:100% !important; height:250px !important; }
+table { width:100%; border-collapse:collapse; font-size:0.85rem; margin-top:10px; }
+th, td { border:1px solid #ddd; padding:6px; text-align:left; }
+th { background-color:#001f3f;color:white;font-size:0.8rem; }
+.last-update { font-size:0.8rem;color:#555;margin-top:5px; }
+.controls { margin:15px 10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+input, select { padding:5px; border:1px solid #ccc; border-radius:5px; cursor:pointer; }
+body.dark-mode { background:#111827; color:#f3f4f6; }
+body.dark-mode header, body.dark-mode footer { background:#0a192f; }
+body.dark-mode .chart-container, body.dark-mode table { background:#1f2937; color:#f3f4f6; }
+body.dark-mode th { background-color:#0a192f; }
+body.dark-mode td, body.dark-mode h3 { color:#f3f4f6; }
+body.dark-mode .last-update { color:#d1d5db; }
+button.expand-btn { background:#001f3f;color:white;border:none;padding:3px 6px;border-radius:4px;cursor:pointer;margin-right:5px; }
+.school-card { margin-bottom:10px; border-radius:8px; overflow:hidden; box-shadow:0 2px 6px rgba(0,0,0,0.1); }
+.school-card .header { padding:8px 10px; cursor:pointer; font-weight:bold; }
+.school-card .content { display:none; padding:8px 10px; background:#f3f4f6; }
+body.dark-mode .school-card .content { background:#1f2937; }
+</style>
 </head>
-<body class="bg-gray-100 min-h-screen text-gray-800">
-  <div class="container mx-auto p-6">
-    <h1 class="text-2xl font-bold mb-4 text-center">📊 Dashboard Aset Sekolah — Rekap Kabupaten</h1>
+<body>
 
-    <div class="flex flex-col md:flex-row gap-4 mb-4 items-start">
-      <div class="card w-full md:w-2/3">
-        <label class="block font-semibold mb-2">Pilih Kecamatan (atau gunakan dropdown untuk filter)</label>
-        <select id="kecamatanSelect" class="p-2 border rounded w-full mb-2"></select>
-        <div class="text-sm text-gray-600">Data otomatis dimuat dari Google Sheets (CSV) — link spreadsheet sudah diset pada `dataKecamatan`.</div>
-      </div>
+<header>
+<div style="display:flex; align-items:center; gap:8px;">
+<img src="https://upload.wikimedia.org/wikipedia/commons/e/e5/Lambang_Kabupaten_Donggala_%282015-sekarang%29.png" alt="Logo" style="height:32px;">
+<h1>Dashboard KIB B</h1>
+</div>
+<div style="display:flex; align-items:center; gap:10px;">
+<nav>
+<a href="#rekapTable">Rekap</a>
+<a href="#sekolahSection">Sekolah</a>
+<a href="#about">Tentang</a>
+</nav>
+<button class="dark-toggle" onclick="toggleDarkMode()"><span id="darkIcon">🌙</span></button>
+</div>
+</header>
 
-      <div class="card w-full md:w-1/3">
-        <div class="flex flex-col gap-2">
-          <button id="refreshBtn" class="px-3 py-2 bg-indigo-600 text-white rounded">🔄 Muat Ulang Data dari Spreadsheet</button>
-          <button id="exportAllExcel" class="px-3 py-2 bg-green-600 text-white rounded">📥 Export Semua (Excel)</button>
-          <button id="exportAllPDF" class="px-3 py-2 bg-red-600 text-white rounded">📄 Export Semua (PDF)</button>
-        </div>
-      </div>
-    </div>
+<main>
+<h2 style="text-align:center;">DINAS PENDIDIKAN DAN KEBUDAYAAN</h2>
 
-    <div id="loading" class="hidden mb-6">
-      <div class="flex items-center gap-3">
-        <div class="animate-spin w-6 h-6 border-2 border-blue-300 border-t-blue-600 rounded-full"></div>
-        <div class="text-sm font-medium">Memuat data dari spreadsheet...</div>
-      </div>
-    </div>
+<div class="controls">
+<label><b>Filter Kecamatan:</b></label>
+<select id="filterKecamatan"><option value="all">Semua Kecamatan</option></select>
+<label><b>Cari Sekolah:</b></label>
+<input type="text" id="searchBox" placeholder="Ketik nama sekolah...">
+</div>
 
-    <!-- Rekap Kabupaten -->
-    <div id="kabupatenCard" class="card mb-6">
-      <div class="flex flex-col md:flex-row gap-4">
-        <div class="flex-1">
-          <h2 class="font-semibold mb-2">Rekap Keseluruhan Kabupaten</h2>
-          <div id="kabSummaryText" class="text-sm mb-2"></div>
-          <canvas id="kabupatenPie" height="220"></canvas>
-        </div>
+<div class="dashboard">
+<div class="chart-container"><h2>Rekap Konfirmasi Keberadaan</h2><canvas id="rekapKonfirmasi"></canvas></div>
+<div class="chart-container"><h2>Rekap Kondisi Barang</h2><canvas id="rekapKondisi"></canvas></div>
+<div class="chart-container"><h2>Rekap Nilai Perolehan</h2><canvas id="rekapNilai"></canvas></div>
+</div>
 
-        <div class="md:w-1/3">
-          <h3 class="font-semibold mb-2">Ringkasan</h3>
-          <div id="kabSummaryBoxes" class="grid grid-cols-1 gap-2 text-sm"></div>
-          <div class="mt-4">
-            <button id="downloadKabutanPNG" class="px-3 py-2 bg-gray-700 text-white rounded">📷 Download Chart PNG</button>
-          </div>
-        </div>
-      </div>
-    </div>
+<h2 style="padding-left:10px;">Rekap Per Kecamatan</h2>
+<div id="lastUpdate" class="last-update" style="padding-left:10px;">Memuat data...</div>
+<div style="padding: 0 10px;">
+<table id="rekapTable">
+<thead>
+<tr>
+<th>Kecamatan</th><th>Ditemukan</th><th>Tidak Ditemukan</th>
+<th>Baik</th><th>Rusak Ringan</th><th>Rusak Berat</th><th>Nilai Perolehan</th>
+</tr>
+</thead>
+<tbody></tbody>
+<tfoot>
+<tr style="font-weight:bold; background:#e5e7eb; color:black;">
+<td>Total</td><td id="totalDitemukan">0</td><td id="totalTidakDitemukan">0</td>
+<td id="totalBaik">0</td><td id="totalRusakRingan">0</td><td id="totalRusakBerat">0</td><td id="totalNilai">0</td>
+</tr>
+</tfoot>
+</table>
+</div>
 
-    <!-- Rekap antar kecamatan -->
-    <div class="card mb-6">
-      <h2 class="font-semibold mb-3">Perbandingan Antar Kecamatan (Bar stacked)</h2>
-      <canvas id="kecamatanBar" height="160"></canvas>
-    </div>
+<div id="sekolahSection" style="padding:10px;"></div>
+</main>
 
-    <!-- Cards per kecamatan (pie + total) -->
-    <div id="kecamatanCards" class="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 mb-8"></div>
-
-    <!-- Detail Sekolah -->
-    <div id="detailContainer" class="mb-10"></div>
-  </div>
+<footer><p>&copy; 2025 DINAS PENDIDIKAN DAN KEBUDAYAAN - Sub Keuangan dan Aset.</p></footer>
 
 <script>
-/* ================== Configuration: spreadsheet links ================== */
-const dataKecamatan = {
-  "Banawa": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRd8vIhHDUbmD6I2aXLX7-_Ysemt2aXA__wKNGoKN0XWWSWCScv5aSmx06H0xkl8g/pub?gid=1917777904&single=true&output=csv",
-  "Banawa Tengah": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRnykw5e_i3dwBIeTua-mpFExEJ4w6hROJ5F6OUHiiGpbtunldeKgXlhN_G-D1V8w/pub?gid=1454720232&single=true&output=csv",
-  "Banawa Selatan": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRhDJK33BtCz7KEi6DWgqheZBrcdgK0X9Pw1r28u5ec1MK-I-kP-QOqrsY0G2OnEQ/pub?gid=708970016&single=true&output=csv",
-  "Rio Pakava": "https://docs.google.com/spreadsheets/d/1_8YllqyTXGDZZCVeozFKAhGru2WS15Bp/export?format=csv",
-  "Pinembani": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQshgCYmG0DHxcwLUzhtUamXTYnWb8tR7WQwnJq9k7ldFz_JhV4GHDE-k_dMO_pSA/pub?gid=1860451546&single=true&output=csv",
-  "Tanantovea": "https://docs.google.com/spreadsheets/d/e/2PACX-1vR3MhjBMD3q8UIfOTdAUOHKMdeGcwr3y2YQGFcDmHDd0IVsOsAECl511LsNJ9ynow9cmY4yBpP1jENa/pub?gid=1200528899&single=true&output=csv",
-  "Labuan": "https://docs.google.com/spreadsheets/d/e/2PACX-1vT7WqNsmpUBIy0-lVm2JdGg1KUKwNgQPpbSyDuuFDwB1aGPY8gsZSBWmxIgiOeJNA/pub?gid=1615242439&single=true&output=csv",
-  "Sindue": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ2sjcmJjTCYD3p6-7pDQTmm3mCVphZIP2-5DGZOHxStucexMcdqPVsfsbnDouFcA/pub?gid=1920885371&single=true&output=csv",
-  "Sindue Tombusabora": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRYHOyrOQ_hNjC1L1FoIMVbbWES0dPGb1OaU6V--PV_lm0O97IHFvtPRhgRNXn_dA/pub?gid=1974330298&single=true&output=csv",
-  "Sindue Tobata": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQIbvzs-jZRcf1z0uV_Ahwh6dNdBgBHw66T358D9wd0-DHimDs8r4ajCvZwLa8Srg/pub?gid=801352666&single=true&output=csv",
-  "Sirenja": "https://docs.google.com/spreadsheets/d/e/2PACX-1vROhU6H6reNQxHKsAmYYgfcaSZyis1vALTmBkYhjAp7BGX_wNdA2cVdgOjFQIIgjQ/pub?output=csv",
-  "Balaesang": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQIf6mV6qgS6fmRe3jz305N8wCDdKWJcKKWSxHtybbo7xoERx15unD-x4rgyFxF-g/pub?gid=1401841928&single=true&output=csv",
-  "Balaesang Tanjung": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQRojLHXJ4W6IEdiNn34kZrMgr5QvPZllm85-sbgD0WxjG6vFMUMQz3QzzGnM-7pw/pub?gid=820099832&single=true&output=csv",
-  "Dampelas": "https://docs.google.com/spreadsheets/d/e/2PACX-1vR_BmCgfv-HOMRKzNMZ1aHL05CZsR7Ie0VZGRJTD29tX1C-ANiKASW1hB_PM69WuQ/pub?gid=1489077321&single=true&output=csv",
-  "Sojol": "https://docs.google.com/spreadsheets/d/e/2PACX-1vT64A3AbrmT4TK8fLj5ctUc3LLMESXVTOuw3nBd2qRTEFIljaxTBW3-Z5u4w7W2Ng/pub?gid=1781390946&single=true&output=csv",
-  "Sojol Utara": "https://docs.google.com/spreadsheets/d/e/2PACX-1vT41KwECicPb2EY8d8BP1f73RM3dhVWYDOxpaFlHZluKFy9owLzyVX7N7mIUm37Tw/pub?gid=502544387&single=true&output=csv"
+// Dark mode
+function toggleDarkMode(){
+    document.body.classList.toggle('dark-mode');
+    document.getElementById("darkIcon").textContent =
+      document.body.classList.contains("dark-mode") ? "☀️" : "🌙";
+}
+
+// Endpoint CSV
+const kecamatanEndpoints = {
+  // contoh endpoint, ganti dengan CSV sebenarnya
+  "Banawa": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRd8vIhHDUbmD6I2aXLX7-_Ysemt2aXA__wKNGoKN0XWWSWCScv5aSmx06H0xkl8g/pub?gid=1917777904&single=true&output=csv"
 };
 
-/* ================== State ================== */
-let allData = []; // unified array of rows {kecamatan,sekolah,barang,nibar,kondisiSebelumnya,kondisiSaatIni,nilai}
-let kabPieChart = null;
-let kecBarChart = null;
-const sekolahPieCache = {}; // cache Chart instances for school pies
+let dataKecamatan = {};
+let chartKonfirmasi, chartKondisi, chartNilai;
 
-/* register plugin for data labels */
-Chart.register(ChartDataLabels);
-
-/* ========== Helpers ========== */
-function normalize(s){ return (s||"").toString().trim().toLowerCase(); }
-
-function getNormalizedRow(row){
-  // build normalized map: normalizedHeader -> value
-  const map = {};
-  Object.keys(row || {}).forEach(k=>{
-    map[normalize(k)] = row[k];
-  });
-  return map;
+// Parsing angka format Indonesia
+function parseNumberIndo(val){
+    if(!val) return 0;
+    val = val.toString().trim().replace(/Rp/gi,'').replace(/\s/g,'');
+    if(val.includes('.') && val.includes(',')){
+        if(val.lastIndexOf(',') > val.lastIndexOf('.')) val = val.replace(/\./g,'').replace(',','.');
+        else val = val.replace(/,/g,'');
+    } else if(val.includes(',')) val = val.replace(/,/g,'');
+    else if(val.includes('.')) val = val.replace(/\./g,'');
+    return parseFloat(val) || 0;
 }
 
-function pickField(nrow, candidates){
-  // candidates: array of normalized names to try
-  for(const c of candidates){
-    if(nrow[c] !== undefined && nrow[c] !== null && nrow[c].toString().trim() !== "") return nrow[c];
-  }
-  return "";
+function formatRupiah(num){ return "Rp "+(num||0).toLocaleString("id-ID"); }
+
+// Fetch CSV
+async function fetchData(url){ return new Promise(resolve => { Papa.parse(url,{download:true,header:true,complete:res=>resolve(res.data)}); }); }
+
+// Load data
+async function loadAllData(){
+    for(const [kec,url] of Object.entries(kecamatanEndpoints)){
+        const raw = await fetchData(url);
+        dataKecamatan[kec] = raw.map(r=>({
+            sekolah: r["Nama Sekolah"]||r["Pengguna Barang"]||"",
+            barang: r["Nama Barang"]||"",
+            nibar: r["NIBAR"]||r["No. Register"]||"",
+            konfirmasi: (r["Konfirmasi Keberadaan"]||"Tidak Ditemukan").toLowerCase().trim(),
+            kondisi: (r["Kondisi"]||"Baik").toLowerCase().trim(),
+            nilai: parseNumberIndo(r["Harga Perolehan"]||r["Nilai Perolehan"])
+        }));
+    }
+    populateFilter();
+    updateData();
+    setInterval(updateData,300000);
 }
 
-function parseNilai(raw){
-  if(raw === null || raw === undefined) return 0;
-  let s = raw.toString().trim();
-  if(!s) return 0;
-  // remove "Rp", spaces
-  s = s.replace(/Rp/gi,"").replace(/\s+/g,"");
-  // If there's a comma used as decimal (rare here), convert commas to dots
-  // But first remove thousands separators: assume '.' or ',' can be thousand separator.
-  // Strategy: if both '.' and ',' appear, assume '.' thousand and ',' decimal or vice versa.
-  // Simpler & robust for Indonesian style: remove dots (thousand sep), replace comma with dot then parseFloat.
-  // Example: "214.783.000" -> "214783000"
-  // Example: "214,783,000.00" -> after remove dots-> "214,783,00000" (bad), so better:
-  // We'll remove any non-digit except comma or dot, then:
-  // If there's more than one separator type, remove dots, replace commas with dot.
-  const hasDot = s.indexOf('.') !== -1;
-  const hasComma = s.indexOf(',') !== -1;
-  if(hasDot && hasComma){
-    // remove dots (thousand), replace comma with dot (decimal)
-    s = s.replace(/\./g,'').replace(/,/g,'.');
-  } else if (hasDot && !hasComma){
-    // likely dots are thousand separators -> remove all dots
-    s = s.replace(/\./g,'');
-  } else if (!hasDot && hasComma){
-    // commas maybe thousand separators or decimals; treat commas as thousand separators -> remove commas
-    // but if there's more than one comma, treat as thousand separators as well
-    s = s.replace(/,/g,'');
-  }
-  // remove any remaining non-digit or dot
-  s = s.replace(/[^0-9.]/g,'');
-  const v = parseFloat(s);
-  if(Number.isNaN(v)) return 0;
-  // If decimal part exists and it's small (<1) we round to integer rupiah
-  return Math.round(v);
+// Populate filter
+function populateFilter(){
+    const filter = document.getElementById("filterKecamatan");
+    Object.keys(dataKecamatan).forEach(k=>{ const opt=document.createElement("option"); opt.value=k; opt.textContent=k; filter.appendChild(opt); });
+    filter.addEventListener("change",updateData);
+    document.getElementById("searchBox").addEventListener("input",updateData);
 }
 
-/* ========== Fetch & parse all sheets ========== */
-async function loadAllFromSpreadsheets(){
-  allData = [];
-  showLoading(true);
+// Update data
+function updateData(){
+    const filter = document.getElementById("filterKecamatan").value;
+    const search = document.getElementById("searchBox").value.toLowerCase();
+    const tbody=document.querySelector("#rekapTable tbody");
+    tbody.innerHTML="";
+    const sekolahSection = document.getElementById("sekolahSection");
+    sekolahSection.innerHTML="";
 
-  // populate kecamatanSelect
-  const select = document.getElementById('kecamatanSelect');
-  select.innerHTML = `<option value="">-- Pilih Kecamatan --</option>`;
-  Object.keys(dataKecamatan).forEach(k => {
-    const o = document.createElement('option'); o.value = k; o.textContent = k;
-    select.appendChild(o);
-  });
+    let total={Ditemukan:0,Tidak:0,Baik:0,Ringan:0,Berat:0,NilaiBaik:0,NilaiRingan:0,NilaiBerat:0,NilaiTotal:0};
 
-  for(const [kecamatan, url] of Object.entries(dataKecamatan)){
-    try{
-      const res = await fetch(url);
-      if(!res.ok) {
-        console.warn(`Gagal memuat ${kecamatan}: ${res.status}`);
-        continue;
-      }
-      const csv = await res.text();
-      const parsed = Papa.parse(csv, { header: true, skipEmptyLines: true, transform: v => v });
-      const rows = parsed.data || [];
+    for(const [kec,data] of Object.entries(dataKecamatan)){
+        if(filter!=="all" && filter!==kec) continue;
+        let ditemukan=0,tidak=0,baik=0,ringan=0,berat=0,nilaiBaik=0,nilaiRingan=0,nilaiBerat=0;
+        const sekolahMap={};
 
-      rows.forEach(rawRow => {
-        const n = getNormalizedRow(rawRow);
+        data.forEach(r=>{
+            if(search && !r.sekolah.toLowerCase().includes(search)) return;
+            if(r.konfirmasi==="ditemukan") ditemukan++; else tidak++;
+            if(r.kondisi==="baik"){ baik++; nilaiBaik+=r.nilai; }
+            else if(r.kondisi==="rusak ringan"){ ringan++; nilaiRingan+=r.nilai; }
+            else if(r.kondisi==="rusak berat"){ berat++; nilaiBerat+=r.nilai; }
 
-        // possible header names
-        const sekolah = pickField(n, ['pengguna barang','pengguna','sekolah','pengguna_barang']) || "Tidak Diketahui";
-        const barang = pickField(n, ['nama barang','nama_barang','barang','nama_item']) || "-";
-        const nibar = pickField(n, ['nibar','no. register','no register','no_register','no_register_barang']) || "-";
-        const kondisiSbl = pickField(n, ['kondisi sebelumnya','kondisi_sebelumnya','kondisi sebelumnya (sebelum)','kondisi_sbl']) || "";
-        const kondisiNowRaw = pickField(n, ['kondisi saat ini','kondisi_saat_ini','kondisi sekarang','kondisi','kondisi_aset','kondisi_terakhir']) || "";
-        const kondisiNow = (kondisiNowRaw && kondisiNowRaw.toString().trim() !== "") ? kondisiNowRaw.toString().trim() : (kondisiSbl || "-");
-
-        // nilai perolehan - try common header names
-        const rawNilai = pickField(n, ['nilai perolehan (rp)','nilai perolehan','harga perolehan','nilai','harga']) || "0";
-        const nilai = parseNilai(rawNilai);
-
-        // sometimes kecamatan column exists in sheet itself; prefer that if present
-        const kecFromRow = pickField(n, ['kecamatan','kec','wilayah','kecamatan_asal']) || kecamatan;
-
-        allData.push({
-          kecamatan: kecFromRow || kecamatan,
-          sekolah: sekolah,
-          barang: barang,
-          nibar: nibar,
-          kondisiSebelumnya: kondisiSbl || "-",
-          kondisiSaatIni: kondisiNow || "-",
-          nilai: nilai
+            if(!sekolahMap[r.sekolah]) sekolahMap[r.sekolah]={barang:0,NilaiBaik:0,NilaiRingan:0,NilaiBerat:0,detail:[]};
+            sekolahMap[r.sekolah].barang++;
+            if(r.kondisi==="baik") sekolahMap[r.sekolah].NilaiBaik+=r.nilai;
+            else if(r.kondisi==="rusak ringan") sekolahMap[r.sekolah].NilaiRingan+=r.nilai;
+            else if(r.kondisi==="rusak berat") sekolahMap[r.sekolah].NilaiBerat+=r.nilai;
+            sekolahMap[r.sekolah].detail.push(r);
         });
-      });
-    } catch(e){
-      console.error("Error loading sheet " + kecamatan, e);
+
+        total.Ditemukan+=ditemukan;
+        total.Tidak+=tidak;
+        total.Baik+=baik;
+        total.Ringan+=ringan;
+        total.Berat+=berat;
+        total.NilaiBaik+=nilaiBaik;
+        total.NilaiRingan+=nilaiRingan;
+        total.NilaiBerat+=nilaiBerat;
+        total.NilaiTotal+=nilaiBaik+nilaiRingan+nilaiBerat;
+
+        // Update table per kecamatan
+        const tr=document.createElement("tr");
+        tr.innerHTML=`<td>${kec}</td>
+            <td>${ditemukan}</td>
+            <td>${tidak}</td>
+            <td>${baik} (${formatRupiah(nilaiBaik)})</td>
+            <td>${ringan} (${formatRupiah(nilaiRingan)})</td>
+            <td>${berat} (${formatRupiah(nilaiBerat)})</td>
+            <td>${formatRupiah(nilaiBaik+nilaiRingan+nilaiBerat)}</td>`;
+        tbody.appendChild(tr);
+
+        // Collapsible per sekolah
+        for(const [namaSekolah, info] of Object.entries(sekolahMap)){
+            const card = document.createElement("div");
+            card.className="school-card";
+            const header = document.createElement("div");
+            header.className="header";
+            const totalBarang = info.detail.length;
+            const countBaik = info.detail.filter(d=>d.kondisi==="baik").length;
+            const countRingan = info.detail.filter(d=>d.kondisi==="rusak ringan").length;
+            const countBerat = info.detail.filter(d=>d.kondisi==="rusak berat").length;
+            header.innerHTML=`${namaSekolah} (${totalBarang} barang) — 
+Baik: ${countBaik} (${formatRupiah(info.NilaiBaik)}), 
+Ringan: ${countRingan} (${formatRupiah(info.NilaiRingan)}), 
+Berat: ${countBerat} (${formatRupiah(info.NilaiBerat)})`;
+
+            if(countBaik >= countRingan && countBaik >= countBerat) header.style.background="#10b981";
+            else if(countRingan >= countBaik && countRingan >= countBerat) header.style.background="#facc15";
+            else header.style.background="#ef4444";
+            header.style.color="white";
+
+            const content = document.createElement("div");
+            content.className="content";
+            let html=`<table style="width:100%; border:1px solid #ddd; font-size:0.8rem;">
+<thead><tr><th>Nama Barang</th><th>NIBAR</th><th>Kondisi</th><th>Nilai</th></tr></thead><tbody>`;
+            info.detail.forEach(d=>{
+                html+=`<tr><td>${d.barang}</td><td>${d.nibar}</td><td>${d.kondisi}</td><td>${formatRupiah(d.nilai)}</td></tr>`;
+            });
+            html+="</tbody></table>";
+            content.innerHTML=html;
+
+            header.onclick = ()=>{ content.style.display = content.style.display==="none"?"block":"none"; };
+            card.appendChild(header);
+            card.appendChild(content);
+            sekolahSection.appendChild(card);
+        }
     }
-  }
 
-  showLoading(false);
-  computeAndRenderAll();
+    document.getElementById("totalDitemukan").textContent=total.Ditemukan;
+    document.getElementById("totalTidakDitemukan").textContent=total.Tidak;
+    document.getElementById("totalBaik").textContent=total.Baik+" ("+formatRupiah(total.NilaiBaik)+")";
+    document.getElementById("totalRusakRingan").textContent=total.Ringan+" ("+formatRupiah(total.NilaiRingan)+")";
+    document.getElementById("totalRusakBerat").textContent=total.Berat+" ("+formatRupiah(total.NilaiBerat)+")";
+    document.getElementById("totalNilai").textContent=formatRupiah(total.NilaiTotal);
+
+    document.getElementById("lastUpdate").textContent="Data terakhir diperbarui: "+new Date().toLocaleTimeString();
+    updateCharts(total);
 }
 
-/* ========== UI Loading ========== */
-function showLoading(on){
-  const el = document.getElementById('loading');
-  if(on) el.classList.remove('hidden'); else el.classList.add('hidden');
+// Update chart
+function updateCharts(total){
+    const ctx1=document.getElementById("rekapKonfirmasi").getContext("2d");
+    const ctx2=document.getElementById("rekapKondisi").getContext("2d");
+    const ctx3=document.getElementById("rekapNilai").getContext("2d");
+    if(chartKonfirmasi) chartKonfirmasi.destroy();
+    if(chartKondisi) chartKondisi.destroy();
+    if(chartNilai) chartNilai.destroy();
+
+    chartKonfirmasi=new Chart(ctx1,{type:"pie",data:{labels:["Ditemukan","Tidak Ditemukan"],datasets:[{data:[total.Ditemukan,total.Tidak],backgroundColor:["#10b981","#ef4444"]}]}});
+    chartKondisi=new Chart(ctx2,{type:"bar",data:{labels:["Baik","Rusak Ringan","Rusak Berat"],datasets:[{data:[total.Baik,total.Ringan,total.Berat],backgroundColor:["#3b82f6","#facc15","#f87171"]}]}});
+    chartNilai=new Chart(ctx3,{type:"doughnut",data:{labels:["Nilai Baik","Nilai Rusak Ringan","Nilai Rusak Berat"],datasets:[{data:[total.NilaiBaik,total.NilaiRingan,total.NilaiBerat],backgroundColor:["#3b82f6","#facc15","#f87171"]}]},options:{plugins:{tooltip:{callbacks:{label:ctx=>formatRupiah(ctx.raw)}}}}});
 }
 
-/* ========== Compute summaries & render charts ========== */
-function computeAndRenderAll(){
-  // kabupaten totals
-  const sekolahSet = new Set();
-  let totalNilai = 0;
-  const kondCounts = { Baik:0, "Rusak Ringan":0, "Rusak Berat":0, Lainnya:0 };
-
-  allData.forEach(r=>{
-    sekolahSet.add(r.sekolah);
-    totalNilai += (r.nilai || 0);
-    const lower = (r.kondisiSaatIni || "").toString().toLowerCase();
-    if(lower.includes('baik')) kondCounts.Baik++;
-    else if(lower.includes('ringan')) kondCounts['Rusak Ringan']++;
-    else if(lower.includes('berat')) kondCounts['Rusak Berat']++;
-    else kondCounts.Lainnya++;
-  });
-
-  // render kabupaten summary
-  document.getElementById('kabSummaryText').innerHTML = `
-    <div class="text-sm">Total Sekolah: <strong>${sekolahSet.size}</strong></div>
-    <div class="text-sm">Total Nilai Perolehan: <strong>Rp ${totalNilai.toLocaleString('id-ID')}</strong></div>
-  `;
-  document.getElementById('kabSummaryBoxes').innerHTML = `
-    <div class="p-2 border rounded">Total Baik: <strong>${kondCounts.Baik}</strong></div>
-    <div class="p-2 border rounded">Total Rusak Ringan: <strong>${kondCounts['Rusak Ringan']}</strong></div>
-    <div class="p-2 border rounded">Total Rusak Berat: <strong>${kondCounts['Rusak Berat']}</strong></div>
-    <div class="p-2 border rounded">Lainnya: <strong>${kondCounts.Lainnya}</strong></div>
-  `;
-
-  // kabupaten pie
-  renderPieWithLabels('kabupatenPie', ['Baik','Rusak Ringan','Rusak Berat','Lainnya'],
-                      [kondCounts.Baik, kondCounts['Rusak Ringan'], kondCounts['Rusak Berat'], kondCounts.Lainnya],
-                      (chart) => { kabPieChart = chart; });
-
-  // per kecamatan aggregation
-  const perKec = {};
-  allData.forEach(r=>{
-    const k = r.kecamatan || 'Tidak Diketahui';
-    if(!perKec[k]) perKec[k] = { rows: [], counts: { Baik:0, 'Rusak Ringan':0, 'Rusak Berat':0, Lainnya:0 }, totalNilai:0 };
-    perKec[k].rows.push(r);
-    perKec[k].totalNilai += (r.nilai || 0);
-    const lower = (r.kondisiSaatIni || "").toString().toLowerCase();
-    if(lower.includes('baik')) perKec[k].counts.Baik++;
-    else if(lower.includes('ringan')) perKec[k].counts['Rusak Ringan']++;
-    else if(lower.includes('berat')) perKec[k].counts['Rusak Berat']++;
-    else perKec[k].counts.Lainnya++;
-  });
-
-  renderKecamatanBar(perKec);
-  renderKecamatanCards(perKec);
-
-  // populate kecamatan select
-  const sel = document.getElementById('kecamatanSelect');
-  // keep existing options; also add any kecamatan that exists in perKec but not in select
-  Object.keys(perKec).forEach(k=>{
-    if(!Array.from(sel.options).some(o=>o.value===k)){
-      const o = document.createElement('option'); o.value=k; o.textContent=k; sel.appendChild(o);
-    }
-  });
-}
-
-/* ===== pie helper with datalabels (labels show name, count, percent) ===== */
-function renderPieWithLabels(canvasIdOrElem, labels, data, onCreate){
-  const ctx = (typeof canvasIdOrElem === 'string') ? document.getElementById(canvasIdOrElem).getContext('2d') : canvasIdOrElem.getContext('2d');
-  // destroy existing chart instance if present on that canvas
-  try {
-    if(ctx.canvas && ctx.canvas.__chartInstance) { ctx.canvas.__chartInstance.destroy(); }
-  } catch(e){}
-
-  const chart = new Chart(ctx, {
-    type: 'pie',
-    data: { labels: labels, datasets: [{ data: data, backgroundColor: ['#4CAF50','#FFC107','#F44336','#9AA0A6'] }] },
-    options: {
-      plugins: {
-        datalabels: {
-          color: '#fff',
-          font: { weight: 'bold', size: 11 },
-          formatter: (value, ctx) => {
-            const total = ctx.chart.data.datasets[0].data.reduce((a,b) => a+b, 0);
-            const pct = total ? ((value/total)*100).toFixed(1) : 0;
-            return `${ctx.chart.data.labels[ctx.dataIndex]}\n${value} (${pct}%)`;
-          },
-          clamp: true,
-          anchor: 'center',
-          align: 'center'
-        },
-        legend: { position: 'bottom' }
-      },
-      responsive: true,
-      maintainAspectRatio: false
-    }
-  });
-
-  // store on canvas for future destroy
-  try { ctx.canvas.__chartInstance = chart; } catch(e){}
-  if(onCreate) onCreate(chart);
-  return chart;
-}
-
-/* ===== Kecamatan bar (stacked) ===== */
-function renderKecamatanBar(perKec){
-  const labels = Object.keys(perKec);
-  const baik = labels.map(k => perKec[k].counts.Baik || 0);
-  const ringan = labels.map(k => perKec[k].counts['Rusak Ringan'] || 0);
-  const berat = labels.map(k => perKec[k].counts['Rusak Berat'] || 0);
-
-  const ctx = document.getElementById('kecamatanBar').getContext('2d');
-  if(kecBarChart) kecBarChart.destroy();
-  kecBarChart = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: labels,
-      datasets: [
-        { label: 'Baik', data: baik, backgroundColor: '#4CAF50' },
-        { label: 'Rusak Ringan', data: ringan, backgroundColor: '#FFC107' },
-        { label: 'Rusak Berat', data: berat, backgroundColor: '#F44336' }
-      ]
-    },
-    options: {
-      responsive: true,
-      plugins: { legend: { position: 'bottom' } },
-      scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } }
-    }
-  });
-}
-
-/* ===== Kecamatan cards (pie + total) ===== */
-function renderKecamatanCards(perKec){
-  const container = document.getElementById('kecamatanCards');
-  container.innerHTML = '';
-  Object.entries(perKec).forEach(([kec, info], idx) => {
-    const card = document.createElement('div');
-    card.className = 'card';
-    const canvasId = `kec_pie_${idx}`;
-    card.innerHTML = `
-      <h3 class="font-semibold mb-1">${kec}</h3>
-      <div class="text-sm mb-2">Total Nilai: <strong>Rp ${info.totalNilai.toLocaleString('id-ID')}</strong></div>
-      <div style="height:180px;"><canvas id="${canvasId}" ></canvas></div>
-      <div class="mt-2 flex justify-between items-center">
-        <button class="px-2 py-1 bg-blue-600 text-white rounded show-detail" data-kec="${kec}">Lihat Detail Sekolah</button>
-        <div class="text-xs text-gray-600">Jumlah Aset: <strong>${info.rows.length}</strong></div>
-      </div>
-    `;
-    container.appendChild(card);
-
-    // render pie for this kecamatan
-    renderPieWithLabels(document.getElementById(canvasId), ['Baik','Rusak Ringan','Rusak Berat','Lainnya'],
-                        [info.counts?.Baik||info.counts?.Baik, info.counts?.['Rusak Ringan']||info.counts?.['Rusak Ringan'], info.counts?.['Rusak Berat']||info.counts?.['Rusak Berat'], info.counts?.Lainnya||0],
-                        (c)=>{/* nothing */});
-
-    // attach click
-    card.querySelector('.show-detail').addEventListener('click', ()=> showDetailForKecamatan(kec));
-  });
-}
-
-/* ========== Show detail per kecamatan -> group sekolah ========== */
-function showDetailForKecamatan(kecamatan){
-  const rows = allData.filter(r => (r.kecamatan||'').toString().trim() === (kecamatan||'').toString().trim());
-  const bySchool = {};
-  rows.forEach(r=>{
-    const s = r.sekolah || 'Tidak Diketahui';
-    if(!bySchool[s]) bySchool[s]=[];
-    bySchool[s].push(r);
-  });
-
-  const container = document.getElementById('detailContainer');
-  container.innerHTML = `<h2 class="text-xl font-semibold mb-4">Detail Kecamatan — ${kecamatan}</h2>`;
-
-  let idx = 0;
-  Object.entries(bySchool).forEach(([school, items])=>{
-    const totalNilai = items.reduce((s,it) => s + (it.nilai||0), 0);
-    const chartId = `school_pie_${idx}`;
-
-    // count kondisi for school
-    const cnt = { Baik:0, 'Rusak Ringan':0, 'Rusak Berat':0, Lainnya:0 };
-    items.forEach(it=>{
-      const lower = (it.kondisiSaatIni||'').toString().toLowerCase();
-      if(lower.includes('baik')) cnt.Baik++;
-      else if(lower.includes('ringan')) cnt['Rusak Ringan']++;
-      else if(lower.includes('berat')) cnt['Rusak Berat']++;
-      else cnt.Lainnya++;
-    });
-
-    const card = document.createElement('div');
-    card.className = 'card mb-4';
-    card.innerHTML = `
-      <div class="flex justify-between items-center">
-        <div>
-          <div class="font-semibold">${school}</div>
-          <div class="text-sm text-gray-600">Jumlah Barang: ${items.length}</div>
-        </div>
-        <div class="flex items-center gap-3">
-          <div class="text-sm">Total: <strong>Rp ${totalNilai.toLocaleString('id-ID')}</strong></div>
-          <button class="px-2 py-1 bg-indigo-600 text-white rounded toggle-school" data-target="${chartId}">➕</button>
-        </div>
-      </div>
-
-      <div id="${chartId}" class="hidden mt-3">
-        <div class="grid md:grid-cols-2 gap-4">
-          <div>
-            <table class="w-full text-sm border">
-              <thead class="bg-gray-200">
-                <tr>
-                  <th class="p-2">Nama Barang</th>
-                  <th class="p-2">NIBAR</th>
-                  <th class="p-2">Kondisi Sebelumnya</th>
-                  <th class="p-2">Kondisi Saat Ini</th>
-                  <th class="p-2">Nilai (Rp)</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${items.map(it=>`
-                  <tr class="border-b">
-                    <td class="p-2">${escapeHtml(it.barang)}</td>
-                    <td class="p-2">${escapeHtml(it.nibar)}</td>
-                    <td class="p-2">${escapeHtml(it.kondisiSebelumnya)}</td>
-                    <td class="p-2">${escapeHtml(it.kondisiSaatIni)}</td>
-                    <td class="p-2 text-right">${(it.nilai||0).toLocaleString('id-ID')}</td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
-            <p class="mt-2 text-right font-semibold">Total Nilai Sekolah: Rp ${totalNilai.toLocaleString('id-ID')}</p>
-
-            <div class="mt-2 flex gap-2">
-              <button class="px-3 py-1 bg-green-600 text-white rounded export-school-excel">Export Excel</button>
-              <button class="px-3 py-1 bg-red-600 text-white rounded export-school-pdf">Export PDF</button>
-            </div>
-          </div>
-
-          <div>
-            <h4 class="font-medium mb-2">Distribusi Kondisi</h4>
-            <div style="height:220px;"><canvas id="${chartId}_canvas"></canvas></div>
-            <div class="mt-2">
-              <button class="px-2 py-1 bg-gray-700 text-white rounded download-chart-png" data-canvas="${chartId}_canvas">Download Pie PNG</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
-    container.appendChild(card);
-
-    // attach toggle
-    card.querySelector('.toggle-school').addEventListener('click', (e)=>{
-      const target = e.currentTarget.dataset.target;
-      const el = document.getElementById(target);
-      el.classList.toggle('hidden');
-      if(!el.classList.contains('hidden') && !sekolahPieCache[target]){
-        // render pie
-        const ctx = document.getElementById(`${chartId}_canvas`).getContext('2d');
-        const chart = renderPieWithLabels(document.getElementById(`${chartId}_canvas`),
-                                         ['Baik','Rusak Ringan','Rusak Berat','Lainnya'],
-                                         [cnt.Baik,cnt['Rusak Ringan'],cnt['Rusak Berat'],cnt.Lainnya]);
-        sekolahPieCache[target] = chart;
-      }
-    });
-
-    // export excel
-    card.querySelector('.export-school-excel').addEventListener('click', ()=>{
-      exportSchoolExcel(school, items);
-    });
-    // export pdf
-    card.querySelector('.export-school-pdf').addEventListener('click', async ()=>{
-      const target = card.querySelector('.toggle-school').dataset.target;
-      const el = document.getElementById(target);
-      if(el.classList.contains('hidden')) { el.classList.remove('hidden'); } // ensure visible for capture
-      await exportElementToPDF(el, `${sanitizeFilename(school)}_Detail.pdf`);
-    });
-
-    // download chart PNG
-    card.querySelector('.download-chart-png').addEventListener('click', (ev)=>{
-      const canvasId = ev.currentTarget.dataset.canvas;
-      const cv = document.getElementById(canvasId);
-      const url = cv.toDataURL('image/png');
-      const a = document.createElement('a'); a.href = url; a.download = `${sanitizeFilename(school)}_pie.png`; a.click();
-    });
-
-    idx++;
-  });
-}
-
-/* ========== Export helpers ========== */
-function exportSchoolExcel(schoolName, list){
-  const rows = list.map(it => ({
-    'Nama Sekolah': schoolName,
-    'Nama Barang': it.barang,
-    'NIBAR': it.nibar,
-    'Kondisi Sebelumnya': it.kondisiSebelumnya,
-    'Kondisi Saat Ini': it.kondisiSaatIni,
-    'Nilai Perolehan (Rp)': it.nilai
-  }));
-  const ws = XLSX.utils.json_to_sheet(rows);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Detail');
-  XLSX.writeFile(wb, `${sanitizeFilename(schoolName)}_Detail.xlsx`);
-}
-
-async function exportElementToPDF(element, filename){
-  const canvas = await html2canvas(element, { scale: 2, useCORS: true });
-  const imgData = canvas.toDataURL('image/png');
-  const { jsPDF } = window.jspdf;
-  const pdf = new jsPDF('p', 'pt', 'a4');
-  const pdfWidth = pdf.internal.pageSize.getWidth();
-  const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-  pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-  pdf.save(filename);
-}
-
-/* Export all data to Excel & PDF (simple listing) */
-document.getElementById('exportAllExcel').addEventListener('click', ()=>{
-  if(!allData || allData.length===0){ alert('Belum ada data. Muat data spreadsheet terlebih dahulu.'); return; }
-  const ws = XLSX.utils.json_to_sheet(allData);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'AllData');
-  XLSX.writeFile(wb, 'Rekap_Aset_All_Kecamatan.xlsx');
-});
-
-document.getElementById('exportAllPDF').addEventListener('click', async ()=>{
-  if(!allData || allData.length===0){ alert('Belum ada data. Muat data spreadsheet terlebih dahulu.'); return; }
-  const el = document.querySelector('.container') || document.body;
-  await exportElementToPDF(el, 'Rekap_Aset_All_Kecamatan.pdf');
-});
-
-/* Download kabupaten pie PNG */
-document.getElementById('downloadKabutanPNG').addEventListener('click', ()=>{
-  const cv = document.getElementById('kabupatenPie');
-  const a = document.createElement('a');
-  a.href = cv.toDataURL('image/png');
-  a.download = 'rekap_kabupaten_pie.png';
-  a.click();
-});
-
-/* Utility: sanitize filename */
-function sanitizeFilename(n){ return (n||'file').replace(/[\\\/:*?"<>|]+/g,'_'); }
-
-/* escapeHtml for safety */
-function escapeHtml(s){
-  if(s===null || s===undefined) return '';
-  return String(s).replace(/[&<>"']/g, function(m){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[m]; });
-}
-
-/* ========== Entry points ========== */
-document.getElementById('refreshBtn').addEventListener('click', ()=> {
-  loadAllFromSpreadsheets();
-});
-
-document.getElementById('kecamatanSelect').addEventListener('change', (e)=>{
-  const v = e.target.value;
-  if(!v) { document.getElementById('detailContainer').innerHTML = ''; return; }
-  showDetailForKecamatan(v);
-});
-
-/* Load on start */
-loadAllFromSpreadsheets();
-
+// Start
+loadAllData();
 </script>
+
 </body>
 </html>
