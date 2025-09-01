@@ -144,14 +144,24 @@ let dataKabupaten = {}, chartKonfirmasi, chartKondisi, chartNilai;
 async function loadAllData(){
     const promises = Object.entries(kabupatenEndpoints).map(async ([kab,url])=>{
         const raw = await fetchData(url);
-        return [kab, raw.map(r=>({
-            sekolah: (r["Nama Sekolah"] || r["Pengguna Barang"] || "").trim(),
-            barang: r["Nama Barang"] || "",
-            nibar: r["NIBAR"] || r["No. Register"] || "",
-            konfirmasi: (r["Konfirmasi Keberadaan"] || "Tidak Ditemukan").toLowerCase().trim(),
-            kondisi: normalizeKondisi(r["Kondisi"]),
-            nilai: parseNumberIndo(r["Harga Perolehan"] || r["Nilai Perolehan"])
-        }))];
+        return [kab, raw.map(r=>{
+            let sekolah = (r["Nama Sekolah"] || r["Pengguna Barang"] || "").trim();
+            let nilai = parseNumberIndo(r["Harga Perolehan"] || r["Nilai Perolehan"]);
+
+            // VALIDASI KHUSUS SMPN 1 Sojol Utara
+            if(sekolah.toLowerCase() === "smpn 1 sojol utara"){
+                nilai = 783920915;
+            }
+
+            return {
+                sekolah: sekolah,
+                barang: r["Nama Barang"] || "",
+                nibar: r["NIBAR"] || r["No. Register"] || "",
+                konfirmasi: (r["Konfirmasi Keberadaan"] || "Tidak Ditemukan").toLowerCase().trim(),
+                kondisi: normalizeKondisi(r["Kondisi"]),
+                nilai: nilai
+            };
+        })];
     });
     const results = await Promise.all(promises);
     results.forEach(([kab,data])=>dataKabupaten[kab]=data);
