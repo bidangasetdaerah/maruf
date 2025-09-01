@@ -5,61 +5,36 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard Inventaris</title>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-  <style>
-    body { font-family: Arial, sans-serif; padding: 20px; }
-    h1 { text-align: center; }
-    #loading { text-align:center; font-size:18px; margin:20px; }
-    #filterBox { margin: 20px 0; text-align:center; }
-    #rekap { margin: 20px 0; padding: 10px; background: #f9f9f9; border: 1px solid #ddd; }
-    #rekap h3 { margin-top: 0; }
-    .collapsible {
-      background-color: #eee;
-      cursor: pointer;
-      padding: 10px;
-      width: 100%;
-      border: none;
-      text-align: left;
-      outline: none;
-      font-size: 16px;
-      margin-bottom: 5px;
-    }
-    .active, .collapsible:hover { background-color: #ccc; }
-    .content {
-      max-height: 0;
-      overflow: hidden;
-      transition: max-height 0.3s ease;
-      border-left: 2px solid #ddd;
-      margin-bottom: 10px;
-      padding: 0 10px;
-    }
-    .content.show { max-height: 1000px; }
-    .item-table { width: 100%; border-collapse: collapse; margin-top: 5px; }
-    .item-table th, .item-table td { border: 1px solid #ddd; padding: 6px; text-align: left; }
-    .item-table th { background-color: #f4f4f4; }
-  </style>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-  <h1>Dashboard Inventaris Aset</h1>
+<body class="bg-gray-50 font-sans p-6">
 
-  <div id="filterBox">
-    <label for="filterKecamatan">Filter Kecamatan: </label>
-    <select id="filterKecamatan"><option value="">Semua</option></select>
-    &nbsp;&nbsp;
-    <label for="searchInput">Cari: </label>
-    <input type="text" id="searchInput" placeholder="Sekolah / Barang...">
+  <h1 class="text-3xl font-bold text-center mb-6">Dashboard Inventaris Aset</h1>
+
+  <div id="filterBox" class="flex flex-col md:flex-row justify-center gap-4 mb-6">
+    <div>
+      <label for="filterKecamatan" class="mr-2 font-semibold">Filter Kecamatan:</label>
+      <select id="filterKecamatan" class="border rounded px-2 py-1">
+        <option value="">Semua</option>
+      </select>
+    </div>
+    <div>
+      <label for="searchInput" class="mr-2 font-semibold">Cari:</label>
+      <input type="text" id="searchInput" placeholder="Sekolah / Barang..." class="border rounded px-2 py-1">
+    </div>
   </div>
 
-  <div id="rekap">
-    <h3>Ringkasan Data</h3>
+  <div id="rekap" class="bg-white border p-4 rounded shadow mb-6">
+    <h3 class="font-semibold text-lg mb-2">Ringkasan Data</h3>
     <div id="rekapContent">Sedang memuat...</div>
   </div>
 
-  <div id="loading">Sedang memuat data...</div>
+  <div id="loading" class="text-center text-gray-700 mb-4">Sedang memuat data...</div>
   <div id="dataTable"></div>
 
   <script>
     const kecamatanEndpoints = {
-       "Banawa": "https://docs.google.com/spreadsheets/d/e/2PACX-1vSCAaRZ9atAiEb-BvMChP_3Wq6wtmUUlNiTWVtwzh7r9KX5sRRZpq5WppSrSebym8z6-qI3zfWQOTNu/pub?gid=0&single=true&output=csv",
+          "Banawa": "https://docs.google.com/spreadsheets/d/e/2PACX-1vSCAaRZ9atAiEb-BvMChP_3Wq6wtmUUlNiTWVtwzh7r9KX5sRRZpq5WppSrSebym8z6-qI3zfWQOTNu/pub?gid=0&single=true&output=csv",
   "Banawa Tengah": "https://docs.google.com/spreadsheets/d/e/2PACX-1vToEAn2MqanfOGSKsDsV0cfGeXt6mJhf7DPEzgFeBl8GQkrbzd4iFuM3tRwyo_wV6m9PlxjQ-9Z0QhC/pub?gid=0&single=true&output=csv",
   "Banawa Selatan": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQwth8ToDewTdvfvhlYuywOolNFwvc6eA4wer_OGKgNk-FoDvIQaHthsQHtMiis3cAsj4AnLzYKXG9p/pub?gid=0&single=true&output=csv",
   "Rio Pakava": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQQX_Z6U7nanrMlPxL8N1m40jkFiMAHCIbZQA_iljNj3QZ8Z5FGMTAzYBbAC_D9Xy2PT3fUf0LL0n7F/pub?gid=0&single=true&output=csv",
@@ -92,18 +67,13 @@
       });
     }
 
-    function parseNumberIndo(str) {
-      if (!str) return 0;
-      return parseFloat(str.trim().replace(/\./g, '').replace(',', '.')) || 0;
-    }
-
     function mapRow(r) {
       return {
         sekolah: r["Nama Sekolah"] || r["Sekolah"] || r["Pengguna Barang"] || "",
         barang: r["Nama Barang"] || r["Barang"] || "",
         nibar: r["NIBAR"] || r["No. Register"] || "",
         konfirmasi: (r["Konfirmasi Keberadaan Kondisi Saat ini"] || r["Konfirmasi Keberadaan"] || r["Konfirmasi"] || "Tidak Ditemukan").toLowerCase().trim(),
-        nilai: parseNumberIndo(r["Nilai Perolehan"] || r["Harga Perolehan"] || r["Nilai"] || "")
+        nilai: r["Nilai Perolehan"] || r["Harga Perolehan"] || r["Nilai"] || ""
       };
     }
 
@@ -150,17 +120,15 @@
 
     function updateRekap(data) {
       const totalBarang = data.length;
-      const totalNilai = data.reduce((sum, d) => sum + d.nilai, 0);
-      let html = `<p><b>Total Barang:</b> ${totalBarang.toLocaleString()} | <b>Total Nilai:</b> Rp ${totalNilai.toLocaleString("id-ID")}</p>`;
+      let html = `<p><b>Total Barang:</b> ${totalBarang}</p>`;
       const byKec = {};
       data.forEach(d => {
-        if (!byKec[d.kecamatan]) byKec[d.kecamatan] = { count:0, nilai:0 };
+        if (!byKec[d.kecamatan]) byKec[d.kecamatan] = { count:0 };
         byKec[d.kecamatan].count++;
-        byKec[d.kecamatan].nilai += d.nilai;
       });
-      html += "<ul>";
+      html += "<ul class='list-disc ml-5'>";
       for (const [kec,val] of Object.entries(byKec)) {
-        html += `<li><b>${kec}</b>: ${val.count.toLocaleString()} barang | Rp ${val.nilai.toLocaleString("id-ID")}</li>`;
+        html += `<li><b>${kec}</b>: ${val.count} barang</li>`;
       }
       html += "</ul>";
       document.getElementById("rekapContent").innerHTML = html;
@@ -175,39 +143,39 @@
         grouped[d.sekolah].push(d);
       });
       for (const [sekolah, items] of Object.entries(grouped)) {
-        const totalNilaiSekolah = items.reduce((s,d)=>s+d.nilai,0);
         const btn = document.createElement("button");
-        btn.className = "collapsible";
-        btn.textContent = `${sekolah} (${items.length} barang | Rp ${totalNilaiSekolah.toLocaleString("id-ID")})`;
+        btn.className = "collapsible w-full text-left bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded mb-2 font-semibold";
+        btn.textContent = `${sekolah} (${items.length} barang)`;
         const content = document.createElement("div");
-        content.className = "content";
+        content.className = "content overflow-hidden transition-max-height duration-300 mb-4";
+
         const table = document.createElement("table");
-        table.className = "item-table";
+        table.className = "min-w-full border border-gray-300";
         table.innerHTML = `
-          <thead>
+          <thead class="bg-gray-100">
             <tr>
-              <th>Kecamatan</th>
-              <th>Barang</th>
-              <th>No. Register</th>
-              <th>Konfirmasi</th>
-              <th>Nilai</th>
+              <th class="border px-2 py-1">Kecamatan</th>
+              <th class="border px-2 py-1">Barang</th>
+              <th class="border px-2 py-1">No. Register</th>
+              <th class="border px-2 py-1">Konfirmasi</th>
+              <th class="border px-2 py-1">Nilai</th>
             </tr>
           </thead>
           <tbody>
             ${items.map(d => `<tr>
-              <td>${d.kecamatan}</td>
-              <td>${d.barang}</td>
-              <td>${d.nibar}</td>
-              <td>${d.konfirmasi}</td>
-              <td>${d.nilai.toLocaleString("id-ID")}</td>
+              <td class="border px-2 py-1">${d.kecamatan}</td>
+              <td class="border px-2 py-1">${d.barang}</td>
+              <td class="border px-2 py-1">${d.nibar}</td>
+              <td class="border px-2 py-1">${d.konfirmasi}</td>
+              <td class="border px-2 py-1">${d.nilai}</td>
             </tr>`).join('')}
           </tbody>`;
+
         content.appendChild(table);
         container.appendChild(btn);
         container.appendChild(content);
 
         btn.addEventListener("click", function() {
-          this.classList.toggle("active");
           content.classList.toggle("show");
         });
       }
@@ -231,5 +199,6 @@
 
     loadAllData();
   </script>
+
 </body>
 </html>
