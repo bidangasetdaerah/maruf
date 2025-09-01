@@ -109,35 +109,30 @@ function toggleDarkMode(){
 
 // === Utility ===
 function debounce(func, wait){ let timeout; return (...args)=>{ clearTimeout(timeout); timeout=setTimeout(()=>func(...args), wait); }; }
-
-// === Parsing & Normalisasi ===
 function parseNumberIndo(val){
     if(!val) return 0;
-    val = val.toString().trim();
-    val = val.replace(/Rp/gi,'').replace(/\s/g,''); // hapus Rp dan spasi
-    val = val.replace(/\./g,''); // hapus titik ribuan
-    val = val.replace(/,/g,'.'); // ubah koma jadi desimal jika ada
+    val = val.toString().trim().replace(/Rp/gi,'').replace(/\s/g,'').replace(/\./g,'').replace(/,/g,'.');
     return parseFloat(val) || 0;
 }
-
 function normalizeKondisi(val){
     if(!val) return "baik";
-    val = val.toString().toLowerCase().trim().replace(/\s+/g," ");
+    val = val.toString().toLowerCase().trim();
     if(val.includes("rusak berat")||val==="rb"||val==="r berat") return "rusak berat";
     if(val.includes("rusak ringan")||val==="rr"||val==="r ringan") return "rusak ringan";
     if(val.includes("baik")||val==="b") return "baik";
     return "baik";
 }
-
 function formatRupiah(num){ return "Rp "+(num||0).toLocaleString("id-ID"); }
 
-// === Endpoint CSV Kabupaten ===
+// === Endpoint CSV ===
 const kabupatenEndpoints = {
   "Donggala": "https://docs.google.com/spreadsheets/d/e/2PACX-1vSebUxTRRPKz3bnjVy0GcfjwU3ouuZ67B8pMO7o56lMPZMrCscTqw3XbQ6UFjevabMYB_Ml_vVrfRln/pub?gid=982774577&single=true&output=csv",
 };
 
 // === Fetch CSV ===
-async function fetchData(url){ return new Promise(resolve=>{ Papa.parse(url,{download:true,header:true,complete:res=>resolve(res.data)}); }); }
+async function fetchData(url){ 
+    return new Promise(resolve=>{ Papa.parse(url,{download:true,header:true,complete:res=>resolve(res.data)}); });
+}
 
 // === Load Data ===
 let dataKabupaten = {}, chartKonfirmasi, chartKondisi, chartNilai;
@@ -147,19 +142,14 @@ async function loadAllData(){
         return [kab, raw.map(r=>{
             let sekolah = (r["Nama Sekolah"] || r["Pengguna Barang"] || "").trim();
             let nilai = parseNumberIndo(r["Harga Perolehan"] || r["Nilai Perolehan"]);
-
-            // VALIDASI KHUSUS SMPN 1 Sojol Utara
-            if(sekolah.toLowerCase() === "smpn 1 sojol utara"){
-                nilai = 783920915;
-            }
-
+            if(sekolah.toLowerCase()==="smpn 1 sojol utara") nilai = 783920915; // koreksi manual
             return {
-                sekolah: sekolah,
-                barang: r["Nama Barang"] || "",
-                nibar: r["NIBAR"] || r["No. Register"] || "",
-                konfirmasi: (r["Konfirmasi Keberadaan"] || "Tidak Ditemukan").toLowerCase().trim(),
+                sekolah, 
+                barang: r["Nama Barang"]||"",
+                nibar: r["NIBAR"] || r["No. Register"]||"",
+                konfirmasi: (r["Konfirmasi Keberadaan"]||"Tidak Ditemukan").toLowerCase().trim(),
                 kondisi: normalizeKondisi(r["Kondisi"]),
-                nilai: nilai
+                nilai
             };
         })];
     });
@@ -177,49 +167,70 @@ function populateFilter(){
     document.getElementById("filterKondisi").addEventListener("change", debounce(updateData,300));
 }
 
-// === Update Data ===
+// === Update Data dengan Pivot ===
 function updateData(){
     const filterKabupaten = document.getElementById("filterKabupaten").value;
     const filterKondisi = document.getElementById("filterKondisi").value;
-    const search=document.getElementById("searchBox").value.toLowerCase();
+    const search = document.getElementById("searchBox").value.toLowerCase();
+
     let total={Ditemukan:0,Tidak:0,Baik:0,Ringan:0,Berat:0,Nilai:0};
     let tbodyHTML="", sekolahHTML="";
+
     for(const [kab,data] of Object.entries(dataKabupaten)){
         if(filterKabupaten!=="all" && filterKabupaten!==kab) continue;
-        let ditemukan=0,tidak=0,baik=0,ringan=0,berat=0,nilai=0;
-        const sekolahMap={};
+
+        // Pivot per sekolah
+        const sekolahMap = {};
         data.forEach(r=>{
             if(search && !r.sekolah.toLowerCase().includes(search)) return;
             if(filterKondisi!=="all" && r.kondisi!==filterKondisi) return;
-            if(r.konfirmasi==="ditemukan") ditemukan++; else tidak++;
-            if(r.kondisi==="baik") baik++; else if(r.kondisi==="rusak ringan") ringan++; else if(r.kondisi==="rusak berat") berat++;
-            nilai+=r.nilai;
-            if(!sekolahMap[r.sekolah]) sekolahMap[r.sekolah]={barang:0,nilai:0,detail:[]};
-            sekolahMap[r.sekolah].barang++; sekolahMap[r.sekolah].nilai+=r.nilai; sekolahMap[r.sekolah].detail.push(r);
+            if(!sekolahMap[r.sekolah]) sekolahMap[r.sekolah]={barang:0,nilai:0,ditemukan:0,tidak:0,baik:0,ringan:0,berat:0};
+            sekolahMap[r.sekolah].barang++;
+            sekolahMap[r.sekolah].nilai += r.nilai;
+            if(r.konfirmasi==="ditemukan") sekolahMap[r.sekolah].ditemukan++;
+            else sekolahMap[r.sekolah].tidak++;
+            if(r.kondisi==="baik") sekolahMap[r.sekolah].baik++;
+            else if(r.kondisi==="rusak ringan") sekolahMap[r.sekolah].ringan++;
+            else if(r.kondisi==="rusak berat") sekolahMap[r.sekolah].berat++;
         });
-        total.Ditemukan+=ditemukan; total.Tidak+=tidak; total.Baik+=baik; total.Ringan+=ringan; total.Berat+=berat; total.Nilai+=nilai;
-        tbodyHTML+=`<tr><td>${kab}</td><td>${ditemukan}</td><td>${tidak}</td><td>${baik}</td><td>${ringan}</td><td>${berat}</td><td>${formatRupiah(nilai)}</td></tr>`;
-        sekolahHTML+=`<h3>Daftar Sekolah - ${kab}</h3><table><thead><tr><th>Nama Sekolah</th><th>Jumlah Barang</th><th>Nilai Perolehan</th></tr></thead><tbody>`;
+
+        // Total kabupaten berdasarkan pivot
+        let ditemukan=0,tidak=0,baik=0,ringan=0,berat=0,nilai=0;
+        for(const val of Object.values(sekolahMap)){
+            ditemukan += val.ditemukan;
+            tidak += val.tidak;
+            baik += val.baik;
+            ringan += val.ringan;
+            berat += val.berat;
+            nilai += val.nilai;
+        }
+
+        total.Ditemukan += ditemukan; total.Tidak += tidak; total.Baik += baik; total.Ringan += ringan; total.Berat += berat; total.Nilai += nilai;
+        tbodyHTML += `<tr><td>${kab}</td><td>${ditemukan}</td><td>${tidak}</td><td>${baik}</td><td>${ringan}</td><td>${berat}</td><td>${formatRupiah(nilai)}</td></tr>`;
+
+        // Detail sekolah
+        sekolahHTML += `<h3>Daftar Sekolah - ${kab}</h3><table><thead><tr><th>Nama Sekolah</th><th>Jumlah Barang</th><th>Nilai Perolehan</th></tr></thead><tbody>`;
         let idx=0;
         for(const [sName,val] of Object.entries(sekolahMap)){
             idx++; const detailId=`detail_${kab}_${idx}`;
-            sekolahHTML+=`<tr><td><button class="expand-btn" onclick="toggleDetailLazy('${detailId}','${kab}','${sName}')">➕</button>${sName}</td><td>${val.barang}</td><td>${formatRupiah(val.nilai)}</td></tr><tr id="${detailId}" style="display:none;" data-loaded="false"><td colspan="3"></td></tr>`;
+            sekolahHTML += `<tr><td><button class="expand-btn" onclick="toggleDetailLazy('${detailId}','${kab}','${sName}')">➕</button>${sName}</td><td>${val.barang}</td><td>${formatRupiah(val.nilai)}</td></tr><tr id="${detailId}" style="display:none;" data-loaded="false"><td colspan="3"></td></tr>`;
         }
-        sekolahHTML+=`</tbody></table>`;
+        sekolahHTML += `</tbody></table>`;
     }
-    document.querySelector("#rekapTable tbody").innerHTML=tbodyHTML;
-    document.getElementById("sekolahSection").innerHTML=sekolahHTML;
-    document.getElementById("totalDitemukan").textContent=total.Ditemukan;
-    document.getElementById("totalTidakDitemukan").textContent=total.Tidak;
-    document.getElementById("totalBaik").textContent=total.Baik;
-    document.getElementById("totalRusakRingan").textContent=total.Ringan;
-    document.getElementById("totalRusakBerat").textContent=total.Berat;
-    document.getElementById("totalNilai").textContent=formatRupiah(total.Nilai);
-    document.getElementById("lastUpdate").textContent="Data terakhir diperbarui: "+new Date().toLocaleTimeString();
+
+    document.querySelector("#rekapTable tbody").innerHTML = tbodyHTML;
+    document.getElementById("sekolahSection").innerHTML = sekolahHTML;
+    document.getElementById("totalDitemukan").textContent = total.Ditemukan;
+    document.getElementById("totalTidakDitemukan").textContent = total.Tidak;
+    document.getElementById("totalBaik").textContent = total.Baik;
+    document.getElementById("totalRusakRingan").textContent = total.Ringan;
+    document.getElementById("totalRusakBerat").textContent = total.Berat;
+    document.getElementById("totalNilai").textContent = formatRupiah(total.Nilai);
+    document.getElementById("lastUpdate").textContent = "Data terakhir diperbarui: "+new Date().toLocaleTimeString();
     updateCharts(total);
 }
 
-// === Update Charts ===
+// === Charts ===
 function updateCharts(total){
     const ctx1=document.getElementById("rekapKonfirmasi").getContext("2d");
     const ctx2=document.getElementById("rekapKondisi").getContext("2d");
@@ -234,7 +245,7 @@ function updateCharts(total){
     chartNilai=new Chart(ctx3,{type:"doughnut",data:{labels:["Total Nilai Barang"],datasets:[{data:[total.Nilai],backgroundColor:["#6366f1"]}]},options:{plugins:{tooltip:{callbacks:{label:ctx=>formatRupiah(ctx.raw)}}}}});
 }
 
-// === Lazy Loading Detail Sekolah ===
+// === Lazy Detail Sekolah ===
 function toggleDetailLazy(id,kab,sekolah){
     const row=document.getElementById(id);
     const btn=row.previousElementSibling.querySelector("button");
@@ -243,11 +254,11 @@ function toggleDetailLazy(id,kab,sekolah){
             const detailData = dataKabupaten[kab].filter(r=>r.sekolah===sekolah);
             let innerHTML=`<table style="width:100%; border:1px solid #ddd; font-size:0.8rem;"><thead><tr><th>Kabupaten</th><th>Nama Barang</th><th>NIBAR</th><th>Kondisi</th><th>Nilai</th></tr></thead><tbody>`;
             detailData.forEach(it=>{
-                let bgColor=it.kondisi==="baik"?"#d1fae5":it.kondisi==="rusak ringan"?"#fef3c7":"#fee2e2";
-                innerHTML+=`<tr style="background:${bgColor}"><td>${kab}</td><td>${it.barang}</td><td>${it.nibar}</td><td>${it.kondisi}</td><td>${formatRupiah(it.nilai)}</td></tr>`;
+                let bgColor = it.kondisi==="baik"?"#d1fae5":it.kondisi==="rusak ringan"?"#fef3c7":"#fee2e2";
+                innerHTML += `<tr style="background:${bgColor}"><td>${kab}</td><td>${it.barang}</td><td>${it.nibar}</td><td>${it.kondisi}</td><td>${formatRupiah(it.nilai)}</td></tr>`;
             });
-            innerHTML+=`</tbody></table>`;
-            row.children[0].innerHTML=innerHTML;
+            innerHTML += `</tbody></table>`;
+            row.children[0].innerHTML = innerHTML;
             row.dataset.loaded="true";
         }
         row.style.display="table-row"; btn.textContent="➖";
@@ -257,6 +268,5 @@ function toggleDetailLazy(id,kab,sekolah){
 // === Start ===
 loadAllData();
 </script>
-
 </body>
 </html>
