@@ -100,34 +100,34 @@ button.expand-btn { background:#001f3f;color:white;border:none;padding:3px 6px;b
 <footer><p>&copy; 2025 DINAS PENDIDIKAN DAN KEBUDAYAAN - Sub Keuangan dan Aset.</p></footer>
 
 <script>
-// Dark mode toggle
+// === Dark Mode Toggle ===
 function toggleDarkMode(){
     document.body.classList.toggle('dark-mode');
     document.getElementById("darkIcon").textContent =
       document.body.classList.contains("dark-mode") ? "☀️" : "🌙";
 }
 
-// Endpoint Google Sheets per kecamatan
-const kecamatanEndpoints = {
-  "Banawa": "https://docs.google.com/spreadsheets/d/e/2PACX-1vSebUxTRRPKz3bnjVy0GcfjwU3ouuZ67B8pMO7o56lMPZMrCscTqw3XbQ6UFjevabMYB_Ml_vVrfRln/pub?gid=982774577&single=true&output=csv"
-};
+// === Utility ===
+function debounce(func, wait){ let timeout; return (...args)=>{ clearTimeout(timeout); timeout=setTimeout(()=>func(...args), wait); }; }
 
-let dataKecamatan = {};
-let chartKonfirmasi, chartKondisi, chartNilai;
-
-// Parsing angka format Indonesia
+// === Parsing & Normalisasi ===
 function parseNumberIndo(val){
     if(!val) return 0;
-    val = val.toString().trim().replace(/Rp/gi,'').replace(/\s/g,'');
+    val = val.toString().trim();
+    val = val.replace(/Rp/gi, '').replace(/\s/g, '').replace(/[^0-9.,-]/g,'');
     if(val.includes('.') && val.includes(',')){
-        if(val.lastIndexOf(',') > val.lastIndexOf('.')) val = val.replace(/\./g,'').replace(',','.');
-        else val = val.replace(/,/g,'');
-    } else if(val.includes(',') && !val.includes('.')) val = val.replace(/,/g,'');
-    else if(val.includes('.') && !val.includes(',')) val = val.replace(/\./g,'');
-    return parseFloat(val)||0;
+        if(val.lastIndexOf(',') > val.lastIndexOf('.')){
+            val = val.replace(/\./g,'').replace(',', '.');
+        } else {
+            val = val.replace(/,/g,'');
+        }
+    } else if(val.includes(',')){
+        val = val.replace(',', '.');
+    } else {
+        val = val.replace(/\./g,'');
+    }
+    return parseFloat(val) || 0;
 }
-
-// Normalisasi kondisi barang
 function normalizeKondisi(val){
     if(!val) return "baik";
     val = val.toString().toLowerCase().trim().replace(/\s+/g," ");
@@ -136,107 +136,79 @@ function normalizeKondisi(val){
     if(val.includes("baik")||val==="b") return "baik";
     return "baik";
 }
-
-// Format Rupiah
 function formatRupiah(num){ return "Rp "+(num||0).toLocaleString("id-ID"); }
 
-// Fetch CSV
-async function fetchData(url){
-    return new Promise(resolve => {
-        Papa.parse(url,{download:true,header:true,complete:res=>resolve(res.data)});
-    });
-}
+// === Endpoint CSV Kecamatan ===
+const kecamatanEndpoints = {
+  "Banawa": "URL_CSV_BANAWA",
+  "Sojol": "URL_CSV_SOJOL",
+  "Sojol Utara": "URL_CSV_SOJOL_UTARA",
+  "Balaesang": "URL_CSV_BALAESANG"
+};
 
-// Debounce utility
-function debounce(func, wait){ let timeout; return (...args)=>{ clearTimeout(timeout); timeout=setTimeout(()=>func(...args), wait); }; }
+// === Fetch CSV ===
+async function fetchData(url){ return new Promise(resolve=>{ Papa.parse(url,{download:true,header:true,complete:res=>resolve(res.data)}); }); }
 
-// Load all data parallel
+// === Load Data ===
+let dataKecamatan = {}, chartKonfirmasi, chartKondisi, chartNilai;
 async function loadAllData(){
     const promises = Object.entries(kecamatanEndpoints).map(async ([kec,url])=>{
         const raw = await fetchData(url);
         return [kec, raw.map(r=>({
-            sekolah: r["Nama Sekolah"]||r["Pengguna Barang"]||"",
-            barang: r["Nama Barang"]||"",
-            nibar: r["NIBAR"]||r["No. Register"]||"",
-            konfirmasi: (r["Konfirmasi Keberadaan"]||"Tidak Ditemukan").toLowerCase().trim(),
+            sekolah: (r["Nama Sekolah"] || r["Pengguna Barang"] || "").trim(),
+            barang: r["Nama Barang"] || "",
+            nibar: r["NIBAR"] || r["No. Register"] || "",
+            konfirmasi: (r["Konfirmasi Keberadaan"] || "Tidak Ditemukan").toLowerCase().trim(),
             kondisi: normalizeKondisi(r["Kondisi"]),
-            nilai: parseNumberIndo(r["Harga Perolehan"]||r["Nilai Perolehan"])
+            nilai: parseNumberIndo(r["Harga Perolehan"] || r["Nilai Perolehan"])
         }))];
     });
-
     const results = await Promise.all(promises);
     results.forEach(([kec,data])=>dataKecamatan[kec]=data);
-
-    populateFilter();
-    updateData();
-    setInterval(updateData,300000);
+    populateFilter(); updateData(); setInterval(updateData,300000);
 }
 
-// Populate filter kecamatan & kondisi
+// === Filter & Search ===
 function populateFilter(){
     const filter = document.getElementById("filterKecamatan");
-    Object.keys(dataKecamatan).forEach(k=>{
-        const opt=document.createElement("option"); opt.value=k; opt.textContent=k;
-        filter.appendChild(opt);
-    });
+    Object.keys(dataKecamatan).forEach(k=>{ const opt=document.createElement("option"); opt.value=k; opt.textContent=k; filter.appendChild(opt); });
     filter.addEventListener("change", debounce(updateData,300));
     document.getElementById("searchBox").addEventListener("input", debounce(updateData,300));
     document.getElementById("filterKondisi").addEventListener("change", debounce(updateData,300));
 }
 
-// Update tabel & chart
+// === Update Data ===
 function updateData(){
     const filterKecamatan = document.getElementById("filterKecamatan").value;
     const filterKondisi = document.getElementById("filterKondisi").value;
     const search=document.getElementById("searchBox").value.toLowerCase();
     let total={Ditemukan:0,Tidak:0,Baik:0,Ringan:0,Berat:0,Nilai:0};
-    let tbodyHTML="";
-    let sekolahHTML="";
-
+    let tbodyHTML="", sekolahHTML="";
     for(const [kec,data] of Object.entries(dataKecamatan)){
         if(filterKecamatan!=="all" && filterKecamatan!==kec) continue;
         let ditemukan=0,tidak=0,baik=0,ringan=0,berat=0,nilai=0;
         const sekolahMap={};
-
         data.forEach(r=>{
             if(search && !r.sekolah.toLowerCase().includes(search)) return;
-            if(filterKondisi !== "all" && r.kondisi !== filterKondisi) return;
-
+            if(filterKondisi!=="all" && r.kondisi!==filterKondisi) return;
             if(r.konfirmasi==="ditemukan") ditemukan++; else tidak++;
-            if(r.kondisi==="baik") baik++;
-            else if(r.kondisi==="rusak ringan") ringan++;
-            else if(r.kondisi==="rusak berat") berat++;
-            nilai += r.nilai;
-
+            if(r.kondisi==="baik") baik++; else if(r.kondisi==="rusak ringan") ringan++; else if(r.kondisi==="rusak berat") berat++;
+            nilai+=r.nilai;
             if(!sekolahMap[r.sekolah]) sekolahMap[r.sekolah]={barang:0,nilai:0,detail:[]};
-            sekolahMap[r.sekolah].barang++;
-            sekolahMap[r.sekolah].nilai+=r.nilai;
-            sekolahMap[r.sekolah].detail.push(r);
+            sekolahMap[r.sekolah].barang++; sekolahMap[r.sekolah].nilai+=r.nilai; sekolahMap[r.sekolah].detail.push(r);
         });
-
-        total.Ditemukan+=ditemukan; total.Tidak+=tidak; total.Baik+=baik;
-        total.Ringan+=ringan; total.Berat+=berat; total.Nilai+=nilai;
-
+        total.Ditemukan+=ditemukan; total.Tidak+=tidak; total.Baik+=baik; total.Ringan+=ringan; total.Berat+=berat; total.Nilai+=nilai;
         tbodyHTML+=`<tr><td>${kec}</td><td>${ditemukan}</td><td>${tidak}</td><td>${baik}</td><td>${ringan}</td><td>${berat}</td><td>${formatRupiah(nilai)}</td></tr>`;
-
         sekolahHTML+=`<h3>Daftar Sekolah - ${kec}</h3><table><thead><tr><th>Nama Sekolah</th><th>Jumlah Barang</th><th>Nilai Perolehan</th></tr></thead><tbody>`;
         let idx=0;
         for(const [sName,val] of Object.entries(sekolahMap)){
-            idx++;
-            const detailId=`detail_${kec}_${idx}`;
-            sekolahHTML+=`<tr>
-                <td><button class="expand-btn" onclick="toggleDetailLazy('${detailId}','${kec}','${sName}')">➕</button>${sName}</td>
-                <td>${val.barang}</td>
-                <td>${formatRupiah(val.nilai)}</td>
-              </tr>
-              <tr id="${detailId}" style="display:none;" data-loaded="false"><td colspan="3"></td></tr>`;
+            idx++; const detailId=`detail_${kec}_${idx}`;
+            sekolahHTML+=`<tr><td><button class="expand-btn" onclick="toggleDetailLazy('${detailId}','${kec}','${sName}')">➕</button>${sName}</td><td>${val.barang}</td><td>${formatRupiah(val.nilai)}</td></tr><tr id="${detailId}" style="display:none;" data-loaded="false"><td colspan="3"></td></tr>`;
         }
         sekolahHTML+=`</tbody></table>`;
     }
-
     document.querySelector("#rekapTable tbody").innerHTML=tbodyHTML;
     document.getElementById("sekolahSection").innerHTML=sekolahHTML;
-
     document.getElementById("totalDitemukan").textContent=total.Ditemukan;
     document.getElementById("totalTidakDitemukan").textContent=total.Tidak;
     document.getElementById("totalBaik").textContent=total.Baik;
@@ -244,11 +216,10 @@ function updateData(){
     document.getElementById("totalRusakBerat").textContent=total.Berat;
     document.getElementById("totalNilai").textContent=formatRupiah(total.Nilai);
     document.getElementById("lastUpdate").textContent="Data terakhir diperbarui: "+new Date().toLocaleTimeString();
-
     updateCharts(total);
 }
 
-// Update chart
+// === Update Charts ===
 function updateCharts(total){
     const ctx1=document.getElementById("rekapKonfirmasi").getContext("2d");
     const ctx2=document.getElementById("rekapKondisi").getContext("2d");
@@ -256,50 +227,32 @@ function updateCharts(total){
     if(chartKonfirmasi) chartKonfirmasi.destroy();
     if(chartKondisi) chartKondisi.destroy();
     if(chartNilai) chartNilai.destroy();
-
     chartKonfirmasi=new Chart(ctx1,{type:"pie",data:{labels:["Ditemukan","Tidak Ditemukan"],datasets:[{data:[total.Ditemukan,total.Tidak],backgroundColor:["#10b981","#ef4444"]}]}});
-
     chartKondisi=new Chart(ctx2,{type:"bar",data:{labels:["Baik","Rusak Ringan","Rusak Berat"],datasets:[{data:[total.Baik,total.Ringan,total.Berat],backgroundColor:["#3b82f6","#facc15","#f87171"]}]}});
-
     chartNilai=new Chart(ctx3,{type:"doughnut",data:{labels:["Total Nilai Barang"],datasets:[{data:[total.Nilai],backgroundColor:["#6366f1"]}]},options:{plugins:{tooltip:{callbacks:{label:ctx=>formatRupiah(ctx.raw)}}}}});
 }
 
-// Lazy loading detail saat expand
+// === Lazy Loading Detail Sekolah ===
 function toggleDetailLazy(id,kec,sekolah){
     const row=document.getElementById(id);
     const btn=row.previousElementSibling.querySelector("button");
     if(row.style.display==="none"){
         if(row.dataset.loaded!=="true"){
             const detailData = dataKecamatan[kec].filter(r=>r.sekolah===sekolah);
-            let innerHTML=`<table style="width:100%; border:1px solid #ddd; font-size:0.8rem;">
-                <thead><tr><th>Kecamatan</th><th>Nama Barang</th><th>NIBAR</th><th>Kondisi</th><th>Nilai</th></tr></thead><tbody>`;
+            let innerHTML=`<table style="width:100%; border:1px solid #ddd; font-size:0.8rem;"><thead><tr><th>Kecamatan</th><th>Nama Barang</th><th>NIBAR</th><th>Kondisi</th><th>Nilai</th></tr></thead><tbody>`;
             detailData.forEach(it=>{
-                let bgColor="";
-                if(it.kondisi==="baik") bgColor="#d1fae5";
-                else if(it.kondisi==="rusak ringan") bgColor="#fef3c7";
-                else if(it.kondisi==="rusak berat") bgColor="#fee2e2";
-
-                innerHTML+=`<tr style="background:${bgColor}">
-                    <td>${kec}</td>
-                    <td>${it.barang}</td>
-                    <td>${it.nibar}</td>
-                    <td>${it.kondisi}</td>
-                    <td>${formatRupiah(it.nilai)}</td>
-                </tr>`;
+                let bgColor=it.kondisi==="baik"?"#d1fae5":it.kondisi==="rusak ringan"?"#fef3c7":"#fee2e2";
+                innerHTML+=`<tr style="background:${bgColor}"><td>${kec}</td><td>${it.barang}</td><td>${it.nibar}</td><td>${it.kondisi}</td><td>${formatRupiah(it.nilai)}</td></tr>`;
             });
             innerHTML+=`</tbody></table>`;
             row.children[0].innerHTML=innerHTML;
             row.dataset.loaded="true";
         }
-        row.style.display="table-row";
-        btn.textContent="➖";
-    } else {
-        row.style.display="none";
-        btn.textContent="➕";
-    }
+        row.style.display="table-row"; btn.textContent="➖";
+    } else { row.style.display="none"; btn.textContent="➕"; }
 }
 
-// Start
+// === Start ===
 loadAllData();
 </script>
 
